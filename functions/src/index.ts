@@ -4,4 +4,4 @@ import { onCall } from 'firebase-functions/v2/https';
 initializeApp();
 
 /** A minimal callable for verifying client-to-backend connectivity. */
-export const health = onCall({ region: 'us-central1' }, () => ({ status: 'ok' }));
+export const health = onCall({ region: 'us-central1', maxInstances: 1 }, () => ({ status: 'ok' }));

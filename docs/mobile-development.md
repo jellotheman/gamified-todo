@@ -1,52 +1,31 @@
 # Cloud development
 
-Create a GitHub Codespace from `dev`. Its devcontainer provides Node.js 22 and Java 21 and runs `npm ci` at the root. Develop in the Codespace and live-test on your phone:
+Create a [Codespace on dev](https://codespaces.new/jellotheman/gamified-todo/tree/dev). Its devcontainer installs Node.js 22, Java 21 and root `npm ci`. If Expo authentication is already available it pulls development configuration automatically; otherwise it prints the one-time login instruction without prompting.
 
 ```sh
+npx eas-cli@latest login
+npm run setup
 npm run start:cloud
 ```
 
-Scan the terminal QR code with SDK 57 Expo Go. On Android, install the SDK 57 version from [Expo Go](https://expo.dev/go). On iPhone, install SDK 57 through [sign.expo.dev](https://sign.expo.dev/), using a free Apple ID; its free provisioning lasts seven days, then repeat the signing/install process. The ordinary App Store Expo Go does not support SDK 57. Both devices use the same tunnel and receive Fast Refresh while Metro runs. See [Expo's signing explanation](https://sign.expo.dev/how-it-works) and [tunnel documentation](https://docs.expo.dev/more/expo-cli/#tunneling).
+`npm run setup` downloads the EAS **development** environment into ignored `apps/mobile/.env.local`. Firebase public values are already stored in EAS, so no manual copying is needed. Failed login/configuration fails clearly. Restart Metro after changing configuration.
 
-For local Windows development, install root dependencies with `npm ci`; `npm run android` opens Expo Go on an existing emulator. No Android SDK or local APK build is needed in Codespaces. The app remains one Hello World screen.
+Scan the terminal QR code with SDK 57 Expo Go. Android: [Expo Go SDK 57](https://expo.dev/go). iPhone: [sign.expo.dev](https://sign.expo.dev/) installs SDK 57 using a free Apple ID; signing lasts seven days, then repeat installation. The ordinary App Store Expo Go does not support SDK 57. Both devices use the same tunnel and Fast Refresh while Metro runs. [Signing explanation](https://sign.expo.dev/how-it-works), [tunnel documentation](https://docs.expo.dev/more/expo-cli/#tunneling).
 
-## Firebase environments
+Local Windows uses root `npm ci`, `npm run setup`, then `npm run android` to open Expo Go on an existing emulator. Codespaces needs no local Android SDK or Xcode. The app remains Hello World.
 
-Copy `apps/mobile/.env.example` to `apps/mobile/.env.local`, then supply the real development Firebase web app API key and app ID. Missing values fail clearly at application startup. Expo exposes all `EXPO_PUBLIC_*` values in client code; use public Firebase SDK configuration only.
+## Environment mapping
 
-`EXPO_PUBLIC_APP_ENV=development` requires `gamified-todo-dev-jellotheman`; `production` requires `gamified-todo-prod-jellotheman`. Development and preview builds use the development backend; production uses the production backend. There is no demo fallback. Restart Metro after configuration changes.
+| EAS environment/channel | App environment | Firebase project |
+| --- | --- | --- |
+| development | development | gamified-todo-dev-jellotheman |
+| preview | development | gamified-todo-dev-jellotheman |
+| production | production | gamified-todo-prod-jellotheman |
 
-The projects currently exist in Google Cloud but Firebase activation returned HTTP 403 for `sreerambiju4@gmail.com`. Complete the account's Firebase Console onboarding/permissions, then run:
+`EXPO_PUBLIC_*` variables are public client configuration bundled into the app. No server credentials belong there. Missing configuration or a project/environment mismatch fails at startup. Real development Firebase is the default; production never uses emulators.
 
-```sh
-npx -y firebase-tools@latest projects:addfirebase gamified-todo-dev-jellotheman
-npx -y firebase-tools@latest projects:addfirebase gamified-todo-prod-jellotheman
-npx -y firebase-tools@latest apps:create WEB "Gamified Todo Development" --project gamified-todo-dev-jellotheman
-npx -y firebase-tools@latest apps:create WEB "Gamified Todo Production" --project gamified-todo-prod-jellotheman
-npx -y firebase-tools@latest apps:sdkconfig WEB --project gamified-todo-dev-jellotheman
-npx -y firebase-tools@latest apps:sdkconfig WEB --project gamified-todo-prod-jellotheman
-```
+The app is linked to [jellotheman/gamified-todo](https://expo.dev/accounts/jellotheman/projects/gamified-todo). Android preview and production profiles create installable showcase APKs using EAS signing. Each profile has its own update channel; fingerprint runtimes keep updates compatible with the installed native app. Changing a native dependency or native configuration requires rebuilding the APK. EAS updates need a matching standalone build; Expo Go uses Metro directly. See [release workflow](cloud-releases.md).
 
-Firebase services are not yet deployed. Cloud Functions deployment requires Blaze billing enabled by the account owner. The Hello World app initializes the client but makes no backend requests.
+Optional backend tests: `npm run test:integration` starts and stops demo Auth/Firestore/Functions emulators. `npm run emulators` is for deliberate local testing; explicitly set `EXPO_PUBLIC_USE_FIREBASE_EMULATORS=true` for a local app. A Codespaces Metro tunnel exposes Metro only, not emulator ports.
 
-## EAS builds and updates
-
-The app is linked to [jellotheman/gamified-todo](https://expo.dev/accounts/jellotheman/projects/gamified-todo). Run EAS commands from `apps/mobile`. In a new Codespace, run `npx eas-cli@latest login` once. Store the four Firebase public variables plus `EXPO_PUBLIC_APP_ENV` and `EXPO_PUBLIC_USE_FIREBASE_EMULATORS=false` in EAS `development`, `preview`, and `production` environments. Use the development project's values for development/preview, production project's values for production. For each value:
-
-```sh
-npx eas-cli@latest env:set --name EXPO_PUBLIC_FIREBASE_API_KEY --value ACTUAL_PUBLIC_API_KEY --environment development --visibility plaintext
-npx eas-cli@latest env:pull --environment development --path .env.local
-```
-
-`eas.json` defines development client, internal preview APK, and production store builds. Each profile has a separate update channel. Fingerprint runtime versions keep updates compatible with the built native app. EAS updates require a matching standalone build; Expo Go live testing uses Metro directly. A native dependency change requires a new build. Standalone iOS builds need Apple's signing/account setup.
-
-```sh
-npx eas-cli@latest build --profile preview --platform android
-npx eas-cli@latest update --channel preview --environment preview --message "Describe the change"
-```
-
-The public environment selector must be set in each EAS environment too, because updates use `--environment`, not a build profile's `env`. Separate Android/iOS development identifiers allow dev and production builds side by side.
-
-Optional emulator checks: `npm run test:integration` starts/stops isolated demo services. `npm run emulators` is for deliberate local testing; set `EXPO_PUBLIC_USE_FIREBASE_EMULATORS=true` explicitly for a local app. A Codespaces Metro tunnel exposes Metro only, not Firebase emulator ports. Normal phone development uses cloud Firebase.
-
-References: [SDK 57](https://docs.expo.dev/versions/v57.0.0/), [EAS profiles](https://docs.expo.dev/build/eas-json/), [EAS environments](https://docs.expo.dev/eas/environment-variables/), [runtime versions](https://docs.expo.dev/eas-update/runtime-versions/).
+References: [SDK 57](https://docs.expo.dev/versions/v57.0.0/), [EAS environments](https://docs.expo.dev/eas/environment-variables/), [runtime versions](https://docs.expo.dev/eas-update/runtime-versions/).

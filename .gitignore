@@ -39,3 +39,4 @@ artifacts/
 .DS_Store
 Thumbs.db
 .idea/
+gha-creds-*.json
