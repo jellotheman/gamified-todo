@@ -26,6 +26,6 @@ Local Windows uses root `npm ci`, `npm run setup`, then `npm run android` to ope
 
 The app is linked to [jellotheman/gamified-todo](https://expo.dev/accounts/jellotheman/projects/gamified-todo). Android preview and production profiles create installable showcase APKs using EAS signing. Each profile has its own update channel; fingerprint runtimes keep updates compatible with the installed native app. Changing a native dependency or native configuration requires rebuilding the APK. EAS updates need a matching standalone build; Expo Go uses Metro directly. See [release workflow](cloud-releases.md).
 
-Optional backend tests: `npm run test:integration` starts and stops demo Auth/Firestore/Functions emulators. `npm run emulators` is for deliberate local testing; explicitly set `EXPO_PUBLIC_USE_FIREBASE_EMULATORS=true` for a local app. A Codespaces Metro tunnel exposes Metro only, not emulator ports.
+Explicitly requested local backend tests: `npm run test:integration` starts and stops demo Auth/Firestore/Functions emulators. `npm run emulators` is for deliberate local testing; explicitly set `EXPO_PUBLIC_USE_FIREBASE_EMULATORS=true` for a local app. A Codespaces Metro tunnel exposes Metro only, not emulator ports.
 
 References: [SDK 57](https://docs.expo.dev/versions/v57.0.0/), [EAS environments](https://docs.expo.dev/eas/environment-variables/), [runtime versions](https://docs.expo.dev/eas-update/runtime-versions/).

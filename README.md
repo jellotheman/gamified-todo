@@ -22,6 +22,6 @@ This makes a normal merge into production `main`, pushes it, and synchronizes `d
 
 Standalone Android showcase APKs are built in EAS. Open **Actions → Cloud release → Run workflow**, choose `dev` or `main`, and enable **Build a standalone APK**. Download the installable APK from the linked [EAS build](https://expo.dev/accounts/jellotheman/projects/gamified-todo/builds). Native/runtime changes need a new APK; ordinary JavaScript changes use automatic updates without spending a build on every push. iPhone live development uses Expo Go; standalone iOS distribution needs separate Apple signing.
 
-Local Windows: `npm ci`, `npm run setup`, then `npm run android` opens Expo Go on an existing Android emulator. Optional emulator smoke tests: `npm run test:integration`. Normal phone development uses real Firebase.
+Local Windows: `npm ci`, `npm run setup`, then `npm run android` opens Expo Go on an existing Android emulator. Local emulator smoke tests run only when explicitly requested: `npm run test:integration`. Normal phone development uses real Firebase.
 
 Details: [mobile development](docs/mobile-development.md), [Firebase development](docs/firebase-development.md), [release setup](docs/cloud-releases.md), [implementation evidence](docs/implementation-checklist.md).
