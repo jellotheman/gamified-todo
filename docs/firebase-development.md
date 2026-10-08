@@ -13,6 +13,8 @@ For app development, run `npm run emulators` in one terminal and `npm run androi
 
 The sole callable export is `health`, returning `{ status: 'ok' }`. Firestore denies every client read/write, including authenticated users, until application rules are deliberately implemented. The integration check creates/deletes an anonymous account, invokes health, writes/reads/deletes a temporary document through Admin, and verifies client permission denials. No application features are present.
 
+`PERMISSION_DENIED` messages during this test are expected assertions that the deny rules work. These local emulators are development/test services. The Hello World screen itself makes no backend requests and can be shown from a standalone release APK without running them; future remote features require a deployed cloud project.
+
 For a real project, sign in with `npx firebase login`, select a project with `npx firebase use --add`, and supply the mobile `.env` settings documented in `mobile-development.md`. Local scripts explicitly retain the demo project. A newly installed global CLI may require reopening PowerShell/CMD; `npx --yes firebase-tools@15.33.0 login` works without the global command on PATH. Cloud provisioning/deployment is separate from these local checks.
 
 Functions declare Node.js 22 in both package engines and Firebase configuration. A newer local host can run commands, but the emulator then warns and falls back to that host runtime. CI and backend runtime verification should use Node 22.
