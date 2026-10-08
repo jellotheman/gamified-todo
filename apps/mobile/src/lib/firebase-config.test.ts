@@ -22,14 +22,46 @@ test('cloud development fails clearly when configuration is missing', () => {
   expect(() => loadConfig()).toThrow('requires a real apiKey');
 });
 
-test('emulators require an explicit opt-in', () => {
-  expect(loadConfig({ EXPO_PUBLIC_USE_FIREBASE_EMULATORS: 'true' }).firebaseConfig.projectId)
-    .toBe('demo-gamified-todo');
+const developmentConfig = {
+  EXPO_PUBLIC_FIREBASE_API_KEY: 'public-test-key',
+  EXPO_PUBLIC_FIREBASE_APP_ID: 'public-test-app',
+  EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: 'gamified-todo-dev-jellotheman.firebaseapp.com',
+  EXPO_PUBLIC_FIREBASE_PROJECT_ID: 'gamified-todo-dev-jellotheman',
+};
+
+test('configured startup defaults to the development Firebase project', () => {
+  const config = loadConfig(developmentConfig);
+  expect(config.appEnvironment).toBe('development');
+  expect(config.firebaseConfig.projectId).toBe(developmentConfig.EXPO_PUBLIC_FIREBASE_PROJECT_ID);
 });
 
-test('production rejects emulator mode', () => {
-  expect(() => loadConfig({ EXPO_PUBLIC_APP_ENV: 'production', EXPO_PUBLIC_USE_FIREBASE_EMULATORS: 'true' }))
-    .toThrow('Production must use cloud Firebase');
+test('production accepts its own Firebase project', () => {
+  const projectId = 'gamified-todo-prod-jellotheman';
+  const config = loadConfig({
+    ...developmentConfig,
+    EXPO_PUBLIC_APP_ENV: 'production',
+    EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: `${projectId}.firebaseapp.com`,
+    EXPO_PUBLIC_FIREBASE_PROJECT_ID: projectId,
+  });
+  expect(config.appEnvironment).toBe('production');
+  expect(config.firebaseConfig.projectId).toBe(projectId);
+});
+
+test('an unsupported environment fails clearly', () => {
+  expect(() => loadConfig({ ...developmentConfig, EXPO_PUBLIC_APP_ENV: 'preview' }))
+    .toThrow('EXPO_PUBLIC_APP_ENV must be development or production');
+});
+
+test.each([
+  ['EXPO_PUBLIC_FIREBASE_API_KEY', 'apiKey'],
+  ['EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN', 'authDomain'],
+  ['EXPO_PUBLIC_FIREBASE_PROJECT_ID', 'projectId'],
+  ['EXPO_PUBLIC_FIREBASE_APP_ID', 'appId'],
+])('%s rejects missing, blank, or demo configuration', (variable, field) => {
+  for (const value of ['', '   ', 'demo-placeholder']) {
+    expect(() => loadConfig({ ...developmentConfig, [variable]: value }))
+      .toThrow(`requires a real ${field}`);
+  }
 });
 
 test.each(['development', 'production'])('%s rejects the other cloud project', (environment) => {
