@@ -1,0 +1,41 @@
+# Dependencies and caches
+node_modules/
+.expo/
+.cache/
+coverage/
+*.tsbuildinfo
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Build outputs and generated native projects
+dist/
+build/
+lib/
+web-build/
+artifacts/
+*.apk
+*.aab
+/apps/mobile/android/
+/apps/mobile/ios/
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+.idea/
