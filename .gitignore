@@ -27,7 +27,7 @@ ui-debug.log*
 # Build outputs and generated native projects
 dist/
 build/
-lib/
+/functions/lib/
 web-build/
 artifacts/
 *.apk
