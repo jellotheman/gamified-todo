@@ -1,0 +1,36 @@
+name: Checks
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run check
+      - run: npm run test:integration
+
+  release:
+    if: github.event_name == 'push'
+    needs: checks
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    uses: ./.github/workflows/release.yml
+    secrets: inherit

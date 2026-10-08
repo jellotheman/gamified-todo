@@ -1,0 +1,21 @@
+{
+  "name": "Gamified Todo",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "21",
+      "installMaven": false,
+      "installGradle": false
+    }
+  },
+  "postCreateCommand": "npm ci && node scripts/setup-cloud.mjs --if-authenticated",
+  "forwardPorts": [
+    8081
+  ],
+  "portsAttributes": {
+    "8081": {
+      "label": "Expo Metro",
+      "onAutoForward": "silent"
+    }
+  }
+}
