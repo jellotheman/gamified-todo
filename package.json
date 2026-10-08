@@ -20,7 +20,8 @@
     "check": "npm run lint && npm run typecheck && npm test && npm run build:functions",
     "build:functions": "npm run build --workspace functions",
     "emulators": "npm run build:functions && firebase emulators:start --project demo-gamified-todo --only auth,firestore,functions",
-    "test:integration": "npm run build:functions && firebase emulators:exec --project demo-gamified-todo --only auth,firestore,functions \"npm run test:integration --workspace functions\""
+    "test:integration": "npm run build:functions && firebase emulators:exec --project demo-gamified-todo --only auth,firestore,functions \"npm run test:integration --workspace functions\"",
+    "start:cloud": "npm run start:cloud --workspace apps/mobile"
   },
   "overrides": {
     "react": "19.2.3",

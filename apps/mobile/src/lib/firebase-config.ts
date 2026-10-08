@@ -5,8 +5,16 @@ if (emulatorFlag !== undefined && emulatorFlag !== 'true' && emulatorFlag !== 'f
   throw new Error('EXPO_PUBLIC_USE_FIREBASE_EMULATORS must be true or false.');
 }
 
-// A demo project never addresses live Firebase services. Cloud mode is explicit.
-export const useFirebaseEmulators = emulatorFlag !== 'false';
+export const appEnvironment = process.env.EXPO_PUBLIC_APP_ENV || 'development';
+if (appEnvironment !== 'development' && appEnvironment !== 'production') {
+  throw new Error('EXPO_PUBLIC_APP_ENV must be development or production.');
+}
+
+// Emulators are an explicit test option. Normal development uses real cloud services.
+export const useFirebaseEmulators = emulatorFlag === 'true';
+if (useFirebaseEmulators && appEnvironment === 'production') {
+  throw new Error('Production must use cloud Firebase.');
+}
 export const firebaseConfig = useFirebaseEmulators
   ? { apiKey: 'demo-api-key', projectId: 'demo-gamified-todo', appId: 'demo-gamified-todo-mobile' }
   : {
@@ -21,6 +29,12 @@ if (!useFirebaseEmulators) {
     if (!value?.trim() || value.startsWith('demo-')) {
       throw new Error(`Cloud Firebase configuration requires a real ${key}. See .env.example.`);
     }
+  }
+  const expectedProject = appEnvironment === 'production'
+    ? 'gamified-todo-prod-jellotheman'
+    : 'gamified-todo-dev-jellotheman';
+  if (firebaseConfig.projectId !== expectedProject) {
+    throw new Error(`${appEnvironment} requires Firebase project ${expectedProject}.`);
   }
 }
 

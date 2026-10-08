@@ -1,20 +1,11 @@
 # Firebase development
 
-Use Node.js 22 and Java 21+ with the root npm workspace. Install once with `npm ci`.
+Use Node.js 22 and root `npm ci`. Normal mobile development uses the real cloud development project; environment setup and account activation steps are in [mobile development](mobile-development.md).
 
-```powershell
-npm run check
-npm run test:integration
-```
+The TypeScript callable `health` returns `{ status: 'ok' }`. Firestore rules deny all client reads/writes until application features are implemented. No auth UI or backend requests are made by the Hello World screen.
 
-`check` runs mobile/backend lint and TypeScript, five mobile tests, and the functions build. `test:integration` builds functions, starts Auth/Firestore/Functions emulators, runs the real SDK smoke test, and shuts the emulators down. First launch downloads the Firestore emulator. Keep ports 9099, 8080, 5001, 4000 and emulator auxiliary ports free.
+Run `npm run check` for lint, TypeScript, mobile tests and the functions build. Run `npm run test:integration` for optional local Auth/Firestore/Functions smoke tests; it starts/stops emulators under the explicit demo project. Java 21 is included in Codespaces for this test. Ports 9099, 8080, 5001 and 4000 must be available.
 
-For app development, run `npm run emulators` in one terminal and `npm run android` in another. Defaults match the mobile client: project `demo-gamified-todo`, Functions region `us-central1`; Android connects through `10.0.2.2`, web through `127.0.0.1`. Emulator UI is at http://127.0.0.1:4000. No Docker or Firebase login is required for these local commands.
+The integration test authenticates anonymously, calls health, writes/reads/deletes a temporary Admin document, verifies denied client operations, and cleans up. Expected permission-denied logs validate the rules. `npm run emulators` keeps these test services running when needed. They are not the phone development backend.
 
-The sole callable export is `health`, returning `{ status: 'ok' }`. Firestore denies every client read/write, including authenticated users, until application rules are deliberately implemented. The integration check creates/deletes an anonymous account, invokes health, writes/reads/deletes a temporary document through Admin, and verifies client permission denials. No application features are present.
-
-`PERMISSION_DENIED` messages during this test are expected assertions that the deny rules work. These local emulators are development/test services. The Hello World screen itself makes no backend requests and can be shown from a standalone release APK without running them; future remote features require a deployed cloud project.
-
-For a real project, sign in with `npx firebase login`, select a project with `npx firebase use --add`, and supply the mobile `.env` settings documented in `mobile-development.md`. Local scripts explicitly retain the demo project. A newly installed global CLI may require reopening PowerShell/CMD; `npx --yes firebase-tools@15.33.0 login` works without the global command on PATH. Cloud provisioning/deployment is separate from these local checks.
-
-Functions declare Node.js 22 in both package engines and Firebase configuration. A newer local host can run commands, but the emulator then warns and falls back to that host runtime. CI and backend runtime verification should use Node 22.
+Both functions package engines and Firebase runtime target Node.js 22. Real deployments need Firebase project activation and owner-enabled Blaze billing. Emulator testing needs neither billing nor cloud authentication.

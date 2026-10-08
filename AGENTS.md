@@ -1,17 +1,9 @@
-# Implementation workflow
+# Workflow
 
-The coordinating agent delegates every implementation and fix to a sub-agent. It inspects work, runs checks, and coordinates handoffs. Delegate verification repairs to a sub-agent too.
+The coordinator delegates implementation and repairs to one sub-agent at a time, then inspects changes and runs checks. Read `docs/implementation-checklist.md` before handing off unfinished setup.
 
-Run the five step agents sequentially, with one implementation step active at a time:
+Work and commit on `dev`. Promote verified changes with a normal `dev` to `main` merge, then merge `main` back into `dev`. `main` is production. Run `npm run check` before promotion; run `npm run test:integration` when backend behavior or rules change.
 
-1. Foundation: root Git repository, npm workspaces, shared commands, ignores, and this execution checklist.
-2. Mobile: Expo Router application, Firebase client integration, and mobile checks.
-3. Firebase: TypeScript functions, emulator configuration, security rules, and backend tests.
-4. CI and APK: automated checks, local Android APK build, and APK verification.
-5. GitHub: repository setup, branch promotion, and remote verification.
+Use the root npm workspace and lockfile. Codespaces is the default workspace; run `npm run start:cloud` for SDK 57 Expo Go live testing on Android and iPhone. See `docs/mobile-development.md` for device installation and cloud configuration. Use real development Firebase by default; emulators are optional tests. Functions deploy on Node.js 22.
 
-Before dispatching a step, read `docs/implementation-checklist.md` for its completion gate and `docs/stack-research.md` for the agreed stack. Each step agent implements only its assigned step, validates it, updates its checklist entry with evidence, commits on `dev`, and returns a handoff. Advance after the current gate passes. Record incomplete checks explicitly and add check commands when their tooling is implemented.
-
-Keep `main` as the initial baseline until step 5 promotes the verified result. Preserve the existing instructions in `apps/mobile/AGENTS.md` and follow them for mobile changes. Use the root npm workspace and lockfile for dependency installation. Declare Node.js 22 for deployed Firebase functions; the local host may run a newer Node.js version.
-
-Optimize development for convenient Windows use. Keep `npm run android` as the simple entry point for an existing Android emulator. CI may use Linux; local development should work directly without Docker.
+Preserve and follow `apps/mobile/AGENTS.md` for mobile changes. Keep `npm run android` as the convenient local Android emulator entry point. Keep the Hello World skeleton until features are requested.
