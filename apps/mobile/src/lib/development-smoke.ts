@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { auth, firebaseApp, firestore, functions } from './firebase';
+import { auth, firebaseApp, firestore } from './firebase';
 
 /** Explicit local wiring check; no sign-in, network request, or application UI. */
 export async function runDevelopmentSmokeCheck() {
   if (!__DEV__) throw new Error('Development smoke checks are disabled in production.');
-  if (auth.app !== firebaseApp || firestore.app !== firebaseApp || functions.app !== firebaseApp) {
+  if (auth.app !== firebaseApp || firestore.app !== firebaseApp) {
     throw new Error('Firebase services do not share the configured app.');
   }
   const key = `@gamified-todo/smoke/${Date.now()}/${Math.random()}`;

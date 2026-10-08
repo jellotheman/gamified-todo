@@ -22,12 +22,10 @@ yarn-error.*
 .firebase/
 firebase-debug.log*
 firestore-debug.log*
-ui-debug.log*
 
 # Build outputs and generated native projects
 dist/
 build/
-/functions/lib/
 web-build/
 artifacts/
 *.apk

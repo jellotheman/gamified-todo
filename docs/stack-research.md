@@ -1,8 +1,8 @@
-# React Native + Firebase research
+# Future architecture research
 
-Research date: 8 October 2026. Recommendations below are architectural judgments; linked documentation and repositories are primary sources.
+Historical research: 8 October 2026. These are future design options, not setup requirements or an approved implementation plan. The current starter uses local Expo Go, Firebase Auth/Firestore and AsyncStorage with a Hello World screen. Functions, server-side rewards, native builds and emulator testing need separate scope and free-plan feasibility review. Recheck linked documentation before adopting an option.
 
-## Recommended stack
+## Possible future stack
 
 Use **Expo + React Native + TypeScript + Expo Router**, Firebase Authentication, Cloud Firestore, Cloud Functions for Firebase (Node.js/TypeScript), and Firebase Admin SDK. Add Storage only for attachments/avatars. Firestore listeners can provide task/progress updates; callable functions provide the API for awarding rewards. A separate Express server, SQL database, or ORM is unnecessary for this scope.
 

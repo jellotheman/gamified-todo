@@ -28,11 +28,7 @@
     ],
     "scheme": "gamifiedtodo",
     "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "54af575f-8e7b-465c-8bde-ca68b52ff92e"
-      }
-    },
-    "owner": "jellotheman"
+      "router": {}
+    }
   }
 }
