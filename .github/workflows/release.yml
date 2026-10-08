@@ -86,4 +86,4 @@ jobs:
       - name: Build APK when requested
         if: inputs.build_android
         working-directory: apps/mobile
-        run: eas build --profile "$EAS_TARGET" --platform android --non-interactive --wait
+        run: eas build --profile "$EAS_TARGET" --platform android --non-interactive --no-wait
