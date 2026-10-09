@@ -16,7 +16,8 @@
     "typecheck": "npm run typecheck --workspaces",
     "lint": "npm run lint --workspaces",
     "test": "npm run test --workspace apps/mobile",
-    "check": "npm run lint && npm run typecheck && npm test"
+    "check": "npm run lint && npm run typecheck && npm test",
+    "prepare": "husky"
   },
   "overrides": {
     "react": "19.2.3",
@@ -26,6 +27,9 @@
   "devDependencies": {
     "eslint": "^9.39.5",
     "firebase-tools": "^15.33.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.9.9",
     "react": "19.2.3"
   }
 }
