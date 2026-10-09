@@ -2,7 +2,7 @@
 
 The coordinator delegates implementation and repairs to one sub-agent at a time, then inspects changes and runs checks. Read `docs/implementation-checklist.md` before handing off unfinished setup.
 
-Work and commit on `dev`. Run root `npm run check` and verify GitHub Actions for the exact pushed commit before promoting with a normal `dev` to `main` merge; merge `main` back into `dev`. `main` is production.
+Work and commit on `dev`. Run root `npm run check`. Never push to a Git remote unless the user explicitly instructs you to push. Before an authorized production push to `origin/main`, verify GitHub Actions for the exact feature commit pushed to `dev`. Use normal `dev` to `main` merges and sync `main` back into `dev`. `origin/main` is production.
 
 Use the root npm workspace and lockfile. Local phone development uses `npm start` and SDK 57 Expo Go with real development Firebase. Read `docs/mobile-development.md` for setup and device testing, and `docs/firebase-development.md` when changing Firebase configuration or manually deploying rules/indexes. Keep services on free plans without billing attachment; never request Blaze or paid hosting.
 
