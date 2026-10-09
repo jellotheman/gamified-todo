@@ -1,19 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  KeyboardAvoidingView, Platform, ScrollView, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authMessage, identity, type Identity } from '../lib/identity';
 import { privateRepository } from '../lib/private-repository';
 import TaskScreen from './task-screen';
+import { Action, Field, fieldProps, Loading, PageHeading, ui as styles } from './frontend';
 
-function Action({ title, onPress, disabled = false }: { title: string; onPress: () => void; disabled?: boolean }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={title}
-    accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
-    style={({ pressed }) => [styles.button, { opacity: disabled ? 0.5 : pressed ? 0.7 : 1 }]}>
-    <Text style={styles.buttonText}>{title}</Text>
-  </Pressable>;
-}
 
 function Notice({ text }: { text: string }) {
   return <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.error}>{text}</Text>;
@@ -28,7 +22,7 @@ function AuthForm() {
   const [pending, setPending] = useState(false);
   const busy = useRef(false);
   const mounted = useRef(true);
-  const passwordInput = useRef<TextInput>(null);
+  const passwordInput = useRef<{ focus: () => void } | null>(null);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   function changeMode(next: typeof mode) {
@@ -60,33 +54,34 @@ function AuthForm() {
   }
 
   const heading = mode === 'register' ? 'Create your account' : mode === 'reset' ? 'Reset your password' : 'Welcome back';
-  return <View style={styles.panel}>
-    <Text accessibilityRole="header" style={styles.heading}>{heading}</Text>
+  return <View style={[styles.panel, styles.frame, { maxWidth: 440 }]}>
+    <PageHeading>{heading}</PageHeading>
     <Text style={styles.label}>Email</Text>
-    <TextInput accessibilityLabel="Email" value={email} onChangeText={setEmail} editable={!pending}
+    <Field {...fieldProps} accessibilityLabel="Email" value={email} onChangeText={setEmail} editable={!pending}
       autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email"
-      textContentType="emailAddress" returnKeyType={mode === 'reset' ? 'go' : 'next'} style={styles.input}
+      textContentType="emailAddress" returnKeyType={mode === 'reset' ? 'go' : 'next'}
       onSubmitEditing={mode === 'reset' ? () => void submit() : () => passwordInput.current?.focus()} />
     {mode !== 'reset' && <>
       <Text style={styles.label}>Password</Text>
-      <TextInput ref={passwordInput} accessibilityLabel="Password" value={password} onChangeText={setPassword} editable={!pending}
+      <Field {...fieldProps} ref={(input: { focus: () => void } | null) => { passwordInput.current = input; }} accessibilityLabel="Password" value={password} onChangeText={setPassword} editable={!pending}
         secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-        textContentType={mode === 'register' ? 'newPassword' : 'password'} returnKeyType="go" style={styles.input}
+        textContentType={mode === 'register' ? 'newPassword' : 'password'} returnKeyType="go"
         onSubmitEditing={() => void submit()} />
       {mode === 'register' && <Text style={styles.copy}>Use at least 6 characters. A longer, unique password is better.</Text>}
     </>}
     {error ? <Notice text={error} /> : null}
     {message ? <Text accessibilityLiveRegion="polite" style={styles.copy}>{message}</Text> : null}
-    {pending && <View accessibilityLiveRegion="polite"><ActivityIndicator /><Text>Working…</Text></View>}
+    {pending && <Loading text="Working…" />}
     <Action title={mode === 'reset' ? 'Send reset email' : mode === 'register' ? 'Register' : 'Sign in'}
-      disabled={pending} onPress={() => void submit()} />
+      primary busy={pending} disabled={pending} onPress={() => void submit()} />
     {mode === 'signIn' && <Action title="Create an account" disabled={pending} onPress={() => changeMode('register')} />}
     {mode !== 'reset' && <Action title="Forgot password?" disabled={pending} onPress={() => changeMode('reset')} />}
     {mode !== 'signIn' && <Action title="Back to sign in" disabled={pending} onPress={() => changeMode('signIn')} />}
   </View>;
 }
 
-function PrivateAccount({ user, onLeave }: { user: Identity; onLeave: () => void }) {
+function PrivateAccount({ user, onLeave, initialAccountOpen }: { user: Identity; onLeave: () => void; initialAccountOpen: boolean }) {
+  const [accountOpen, setAccountOpen] = useState(initialAccountOpen);
   const [repository, setRepository] = useState<ReturnType<typeof privateRepository> | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
@@ -105,12 +100,18 @@ function PrivateAccount({ user, onLeave }: { user: Identity; onLeave: () => void
     return () => { active = false; stop(); };
   }, [user.uid, attempt]);
   return <View style={styles.panel}>
-    <Text accessibilityRole="header" style={styles.heading}>Your tasks</Text>
-    <Text style={styles.copy}>{user.email}</Text>
+    <View style={styles.header}><PageHeading>{accountOpen ? 'Account' : 'Tasks'}</PageHeading>
+      <Action title={accountOpen ? 'Back to tasks' : 'Account'} onPress={() => setAccountOpen(!accountOpen)} /></View>
+    {accountOpen ? <View style={styles.frame}>
+      <Text style={styles.label}>Signed in as</Text><Text style={styles.copy}>{user.email || 'Email address unavailable.'}</Text>
+      <Action title="Sign out" danger onPress={onLeave} />
+    </View> : null}
     {error ? <><Notice text={error} /><Action title="Retry account loading" onPress={() => { setReady(false); setError(''); setAttempt(attempt + 1); }} /></>
-      : <Text accessibilityLiveRegion="polite" style={styles.copy}>{ready ? 'Your private account is ready.' : 'Loading your private account…'}</Text>}
-    <Action title="Sign out" onPress={onLeave} />
-    {ready && repository ? <TaskScreen key={user.uid} repository={repository} /> : null}
+      : !ready ? <Loading text="Loading your private account…" /> : null}
+    <View style={accountOpen ? { display: 'none' } : undefined} accessibilityElementsHidden={accountOpen}
+      importantForAccessibility={accountOpen ? 'no-hide-descendants' : 'auto'}>
+      {ready && repository ? <TaskScreen key={user.uid} repository={repository} /> : null}
+    </View>
   </View>;
 }
 
@@ -118,6 +119,7 @@ export default function IdentityScreen() {
   const [user, setUser] = useState<Identity | null | undefined>(undefined);
   const [sessionError, setSessionError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [returnToAccount, setReturnToAccount] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
   const signOutBusy = useRef(false);
@@ -129,7 +131,7 @@ export default function IdentityScreen() {
     const stop = identity.observe((next) => {
       if (!active) return;
       generation.current++;
-      setUser(next); setSessionError(''); setSigningOut(false); setSignOutError('');
+      setUser(next); setReturnToAccount(false); setSessionError(''); setSigningOut(false); setSignOutError('');
     }, () => { if (active) setSessionError('Unable to restore your session. Please retry.'); });
     return () => { active = false; stop(); };
   }, [attempt]);
@@ -151,27 +153,14 @@ export default function IdentityScreen() {
         {sessionError ? <View><Notice text={sessionError} /><Action title="Retry session restoration" onPress={() => {
           setUser(undefined); setSessionError(''); setAttempt(attempt + 1);
         }} /></View>
-          : user === undefined ? <View accessibilityLiveRegion="polite"><ActivityIndicator /><Text>Restoring your session…</Text></View>
+          : user === undefined ? <Loading text="Restoring your session…" />
           : signingOut ? <View>
             {signOutError ? <><Notice text={signOutError} /><Action title="Retry sign out" onPress={() => void leave()} />
-              <Action title="Return to account" onPress={() => { setSigningOut(false); setSignOutError(''); }} /></>
-              : <View accessibilityLiveRegion="polite"><ActivityIndicator /><Text>Signing out…</Text></View>}
+              <Action title="Return to account" onPress={() => { setReturnToAccount(true); setSigningOut(false); setSignOutError(''); }} /></>
+              : <Loading text="Signing out…" />}
           </View>
-          : user ? <PrivateAccount key={user.uid} user={user} onLeave={() => void leave()} /> : <AuthForm key="signed-out" />}
+          : user ? <PrivateAccount key={user.uid} user={user} initialAccountOpen={returnToAccount} onLeave={() => void leave()} /> : <AuthForm key="signed-out" />}
       </ScrollView>
     </KeyboardAvoidingView>
   </SafeAreaView>;
 }
-
-const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: '#fff' },
-  container: { flexGrow: 1, padding: 24 },
-  panel: { width: '100%', maxWidth: 440, alignSelf: 'center', gap: 12 },
-  heading: { color: '#15251c', fontSize: 28, fontWeight: '700', marginBottom: 12 },
-  label: { color: '#15251c', fontSize: 16, fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: '#66756c', borderRadius: 8, minHeight: 48, padding: 12, fontSize: 16, color: '#15251c' },
-  copy: { fontSize: 16, color: '#34483b' },
-  error: { fontSize: 16, color: '#9a2020' },
-  button: { minHeight: 48, borderRadius: 8, backgroundColor: '#214d35', padding: 12, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-});

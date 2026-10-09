@@ -1,3 +1,4 @@
+import { FrontendProvider } from '../components/frontend';
 import { Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -14,9 +15,9 @@ export default function RootLayout() {
     }
   }, []);
   return (
-    <>
+    <FrontendProvider>
       <Slot />
-      <StatusBar style="auto" />
-    </>
+      <StatusBar style="light" />
+    </FrontendProvider>
   );
 }

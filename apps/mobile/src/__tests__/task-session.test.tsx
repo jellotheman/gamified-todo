@@ -51,10 +51,26 @@ test('account change and sign-out purge drafts and tasks, detach listeners and i
   expect(screen.queryByText('Private A')).toBeNull();
   let rejectSignOut!: (reason: Error) => void;
   jest.mocked(identity.signOut).mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectSignOut = reject; }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Account' }));
   await fireEvent.press(screen.getByRole('button', { name: 'Sign out' }));
   expect(screen.queryByLabelText('New task title')).toBeNull();
   expect(stops[2]).toHaveBeenCalled(); expect(stops[3]).toHaveBeenCalled();
   await act(() => rejectSignOut(new Error('offline')));
   expect(screen.getByRole('button', { name: 'Retry sign out' })).toBeTruthy();
   expect(screen.queryByText('b@example.com')).toBeNull();
+});
+
+test('Account navigation preserves a draft and expanded windows while hiding inactive controls', async () => {
+  await render(<IdentityScreen />);
+  await act(() => observe({ uid: 'a', email: 'a@example.com' }));
+  const repository = repositories.get('a')!;
+  await act(() => callbacks.get('a/active')!({ tasks: [], hasMore: true }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Load more active tasks' }));
+  await fireEvent.changeText(screen.getByLabelText('New task title'), 'Keep this draft');
+  await fireEvent.press(screen.getByRole('button', { name: 'Account' }));
+  expect(screen.getByText('a@example.com')).toBeTruthy();
+  expect(screen.queryByLabelText('New task title')).toBeNull();
+  await fireEvent.press(screen.getByRole('button', { name: 'Back to tasks' }));
+  expect(screen.getByLabelText('New task title').props.value).toBe('Keep this draft');
+  expect(repository.subscribeTaskWindow).toHaveBeenLastCalledWith('active', 50, expect.any(Function), expect.any(Function), expect.any(Function));
 });

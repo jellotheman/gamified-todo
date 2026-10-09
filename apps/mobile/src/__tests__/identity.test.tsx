@@ -70,7 +70,7 @@ test('successful registration passes trimmed email and enters the observed authe
   });
   await fireEvent.press(screen.getByRole('button', { name: 'Register' }));
   expect(createUserWithEmailAndPassword).toHaveBeenCalledWith(auth, 'new@example.com', 'private-password');
-  expect(screen.getByText('Your tasks')).toBeTruthy();
+  expect(screen.getByText('Tasks')).toBeTruthy();
   expect(screen.queryByLabelText('Password')).toBeNull();
 });
 
@@ -85,7 +85,7 @@ test('private account failures offer retry and unconfirmed local snapshots never
   await act(() => profileChanged({ ...mockProfile, metadata: { fromCache: false, hasPendingWrites: true } }));
   expect(screen.getByText('Loading your private account…')).toBeTruthy();
   await act(() => profileChanged({ ...mockProfile, metadata: { fromCache: false, hasPendingWrites: false } }));
-  expect(screen.getByText('Your private account is ready.')).toBeTruthy();
+  expect(screen.queryByText('Loading your private account…')).toBeNull();
 });
 
 test('invalid input avoids a network request and a pending sign in blocks duplicate submissions', async () => {
@@ -128,14 +128,15 @@ test('password reset success and unknown email share a generic response; network
 test('account switching detaches private subscriptions and ignores stale private callbacks', async () => {
   await render(<Index />);
   await act(() => identityChanged(user('owner-a', 'first@example.com')));
-  expect(screen.getByText('Your tasks')).toBeTruthy();
+  expect(screen.getByText('Tasks')).toBeTruthy();
   expect(screen.getByText('Loading your private account…')).toBeTruthy();
   const staleCallback = profileChanged;
   await act(() => profileChanged({ ...mockProfile, metadata: { fromCache: false, hasPendingWrites: false } }));
-  expect(screen.getByText('Your private account is ready.')).toBeTruthy();
+  expect(screen.queryByText('Loading your private account…')).toBeNull();
   await act(() => identityChanged(user('owner-b', 'second@example.com')));
   expect(mockStopSnapshot).toHaveBeenCalled();
   expect(screen.queryByText('first@example.com')).toBeNull();
+  await fireEvent.press(screen.getByRole('button', { name: 'Account' }));
   expect(screen.getByText('second@example.com')).toBeTruthy();
   await act(() => staleCallback({ exists: () => false, metadata: { fromCache: false, hasPendingWrites: false } }));
   expect(screen.queryByRole('alert')).toBeNull();
@@ -147,8 +148,9 @@ test('sign out clears private state before acknowledgement and failure has acces
   await act(() => identityChanged(user('owner-a', 'first@example.com')));
   let rejectSignOut: (error: unknown) => void = () => {};
   jest.mocked(signOut).mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectSignOut = reject; }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Account' }));
   await fireEvent.press(screen.getByRole('button', { name: 'Sign out' }));
-  expect(screen.queryByText('Your tasks')).toBeNull();
+  expect(screen.queryByText('Tasks')).toBeNull();
   expect(screen.queryByText('first@example.com')).toBeNull();
   expect(mockStopSnapshot).toHaveBeenCalled();
   await act(() => rejectSignOut({ code: 'auth/network-request-failed' }));
@@ -186,4 +188,18 @@ test('registration failure offers retry without losing input', async () => {
   expect(screen.getByRole('alert')).toBeTruthy();
   expect(screen.getByLabelText('Email').props.value).toBe('new@example.com');
   expect(screen.getByRole('button', { name: 'Register' }).props.accessibilityState.disabled).toBe(false);
+});
+
+
+test('Account displays a missing-email fallback and failed sign-out can return to Account', async () => {
+  await render(<Index />);
+  await act(() => identityChanged({ uid: 'no-email', email: null } as User));
+  await fireEvent.press(screen.getByRole('button', { name: 'Account' }));
+  expect(screen.getByText('Email address unavailable.')).toBeTruthy();
+  jest.mocked(signOut).mockRejectedValueOnce({ code: 'auth/network-request-failed' });
+  await fireEvent.press(screen.getByRole('button', { name: 'Sign out' }));
+  expect(screen.queryByText('Email address unavailable.')).toBeNull();
+  await fireEvent.press(screen.getByRole('button', { name: 'Return to account' }));
+  expect(screen.getByText('Email address unavailable.')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Back to tasks' })).toBeTruthy();
 });
