@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, AccessibilityInfo, findNodeHandle } from 'react-native';
 import { Checkbox } from 'react-native-paper';
-import { Action, Field, fieldProps, colors, ui, Loading } from './frontend';
+import { Action, Field, fieldProps, colors, ui, Loading, PageHeading } from './frontend';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { privateRepository, Task, TaskDraft, TaskSection, TaskWindow, ListStatus } from '../lib/private-repository';
 
@@ -121,7 +121,7 @@ export default function TaskScreen({ repository }: { repository: Repository }) {
     {dialog ? <Modal visible animationType="none" onShow={() => { if (dialog.kind !== 'edit') focus(dialogHeading.current); }} onRequestClose={() => closeDialog(false)}>
       <SafeAreaView style={ui.page}><KeyboardAvoidingView style={ui.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.container}><View accessibilityViewIsModal style={ui.panel}>
-      <View ref={dialogHeading} tabIndex={-1}><Text accessibilityRole="header" style={ui.heading}>{dialog.kind === 'edit' ? 'Edit task' : dialog.kind === 'actions' ? 'Task actions' : 'Delete this task?'}</Text></View>
+      <View ref={dialogHeading} tabIndex={-1}><PageHeading>{dialog.kind === 'edit' ? 'Edit task' : dialog.kind === 'actions' ? 'Task actions' : 'Delete this task?'}</PageHeading></View>
       {dialog.kind === 'edit' ? <Field {...fieldProps} autoFocus label="Edit task title" accessibilityLabel="Edit task title" value={dialog.title} editable={!dialogPending}
         onChangeText={(title) => { setDialog({ ...dialog, title }); setDialogError(''); }} returnKeyType="done" onSubmitEditing={() => void saveDialog()} />
         : <Text style={styles.taskTitle}>{dialog.task.title}</Text>}
@@ -159,7 +159,7 @@ export default function TaskScreen({ repository }: { repository: Repository }) {
         {list.status === 'confirmed' && tasks.length === 0 ? <Text style={styles.copy}>{section === 'active' ? 'A little space to begin. Add your first task above.' : 'Your finished tasks will appear here.'}</Text> : null}
         {tasks.map((task: Task) => <View key={task.id} style={styles.row}>
           <View style={styles.rowControls}>
-          <Pressable style={styles.checkTarget} accessibilityRole="checkbox" accessibilityLabel={task.completedAt ? `Undo completion of ${task.title}` : `Complete ${task.title}`}
+          <Pressable style={({ pressed }) => [styles.checkTarget, pressed && styles.pressed]} accessibilityRole="checkbox" accessibilityLabel={task.completedAt ? `Undo completion of ${task.title}` : `Complete ${task.title}`}
             aria-checked={!!task.completedAt} aria-busy={!!completions[task.id]?.pending} aria-disabled={!!completions[task.id] || dialog?.task.id === task.id}
             accessibilityState={{ checked: !!task.completedAt, disabled: !!completions[task.id] || dialog?.task.id === task.id, busy: !!completions[task.id]?.pending }}
             disabled={!!completions[task.id] || dialog?.task.id === task.id} onPress={() => void complete(task, task.completedAt === null)}>
