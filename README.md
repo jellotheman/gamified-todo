@@ -1,6 +1,6 @@
 # Gamified Todo
 
-Expo SDK 57, TypeScript, Expo Router and Firebase, with one **Hello World** screen. Firebase Auth, Firestore and local storage are wired; task features come later.
+Expo SDK 57, TypeScript, Expo Router and Firebase. Register or sign in with email/password, reset your password and sign out. Sessions persist locally. The authenticated task screen supports private capture, title editing, guarded deletion, completion and undo, with server-confirmed saves and paged active/completed lists. Daily goal UI comes later.
 
 Install Node.js 22.13 or newer. From the repository root in PowerShell:
 
@@ -10,13 +10,13 @@ Copy-Item apps/mobile/.env.example apps/mobile/.env.local
 npm start
 ```
 
-Copy the environment file only on first setup; it contains the existing development Firebase public configuration. Keep your computer and phone on the same Wi-Fi, then scan Metro's QR code with SDK 57 Expo Go. See [mobile development](docs/mobile-development.md) for Android and iPhone installation and troubleshooting.
+Copy the environment file only on first setup; it contains the existing development Firebase public configuration. EXPO_PUBLIC_APP_ENV must explicitly be development or production; missing/blank/unsupported selectors fail startup. Keep the active local .env.local set to development when promoting source to main. The public production reference is apps/mobile/.env.production.example. Keep your computer and phone on the same Wi-Fi, then scan Metro's QR code with SDK 57 Expo Go. See [mobile development](docs/mobile-development.md) for Android and iPhone installation and troubleshooting.
 
 Run `npm run check` before committing. GitHub Actions runs the same lint, TypeScript and mocked tests on `dev` and `main`; it does not deploy anything. Work on `dev`, verify its exact commit in Actions, merge it into production `main`, then sync `dev` from `main`.
 
 [Firebase configuration and manual rules deployment](docs/firebase-development.md) · [Implementation checklist](docs/implementation-checklist.md)
 
-Everyday changes start on `dev` and finish with checks, a commit and a push:
+Everyday changes start on `dev` and finish with checks and a local commit. Push only when the user explicitly instructs it; the following push/promotion workflow requires that authorization:
 
 ```powershell
 git switch dev
@@ -37,4 +37,4 @@ git merge main
 git push origin dev
 ```
 
-Confirm Checks pass for both pushed branch tips.
+Confirm Checks pass for both pushed branch tips. This promotes the same source through dev and main; runtime Firebase selection comes from the explicit environment values, not the branch or NODE_ENV. A Git push performs no automatic Firebase, hosting or native deployment. Production runtime provisioning/deployment remains a separate explicit operation.

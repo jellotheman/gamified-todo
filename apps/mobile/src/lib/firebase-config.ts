@@ -1,4 +1,4 @@
-export const appEnvironment = process.env.EXPO_PUBLIC_APP_ENV || 'development';
+export const appEnvironment = process.env.EXPO_PUBLIC_APP_ENV;
 if (appEnvironment !== 'development' && appEnvironment !== 'production') {
   throw new Error('EXPO_PUBLIC_APP_ENV must be development or production.');
 }
@@ -20,4 +20,22 @@ const expectedProject = appEnvironment === 'production'
   : 'gamified-todo-dev-jellotheman';
 if (firebaseConfig.projectId !== expectedProject) {
   throw new Error(`${appEnvironment} requires Firebase project ${expectedProject}.`);
+}
+
+// Approved public web-app identifiers. Auth uses apiKey to select its account
+// store, so checking projectId alone cannot prevent a mixed-project login.
+// Rotate these public identifiers alongside the environment files when needed.
+const approvedWebApp = appEnvironment === 'production' ? {
+  apiKey: 'AIzaSyC2oiAfio-kfIlMAksg7wSuEto0LZAU1yw',
+  appId: '1:126696046144:web:9974e13bb62a0277e9a9a5',
+  authDomain: 'gamified-todo-prod-jellotheman.firebaseapp.com',
+} : {
+  apiKey: 'AIzaSyDnZnOchr8UCw3LXSfWSw0DKqahYaChDG0',
+  appId: '1:1062431403819:web:5af6597c61fcbc39b6df6e',
+  authDomain: 'gamified-todo-dev-jellotheman.firebaseapp.com',
+};
+for (const field of ['apiKey', 'appId', 'authDomain'] as const) {
+  if (firebaseConfig[field] !== approvedWebApp[field]) {
+    throw new Error(`${appEnvironment} requires Firebase ${field} for its approved web app.`);
+  }
 }

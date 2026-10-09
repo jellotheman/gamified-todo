@@ -3,6 +3,8 @@
 Issues and specs live in GitHub Issues for `jellotheman/gamified-todo`.
 Use the `gh` CLI from this repository.
 
+GitHub issues are repository-wide. Implementation tickets target `dev`. Git pushes require explicit user instruction; local merges are not an approval gate.
+
 ## Operations
 
 - Publish to the issue tracker: create a GitHub issue.
