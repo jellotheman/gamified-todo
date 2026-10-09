@@ -21,17 +21,18 @@ function loadConfig(environment: Record<string, string> = {}) {
 }
 
 test('startup fails clearly when Firebase configuration is missing', () => {
-  expect(() => loadConfig()).toThrow('requires a real apiKey');
+  expect(() => loadConfig({ EXPO_PUBLIC_APP_ENV: 'development' })).toThrow('requires a real apiKey');
 });
 
 const developmentConfig = {
+  EXPO_PUBLIC_APP_ENV: 'development',
   EXPO_PUBLIC_FIREBASE_API_KEY: 'AIzaSyDnZnOchr8UCw3LXSfWSw0DKqahYaChDG0',
   EXPO_PUBLIC_FIREBASE_APP_ID: '1:1062431403819:web:5af6597c61fcbc39b6df6e',
   EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: 'gamified-todo-dev-jellotheman.firebaseapp.com',
   EXPO_PUBLIC_FIREBASE_PROJECT_ID: 'gamified-todo-dev-jellotheman',
 };
 
-test('configured startup defaults to the development Firebase project', () => {
+test('explicit development startup uses the approved development Firebase project', () => {
   const config = loadConfig(developmentConfig);
   expect(config.appEnvironment).toBe('development');
   expect(config.firebaseConfig.projectId).toBe(developmentConfig.EXPO_PUBLIC_FIREBASE_PROJECT_ID);
@@ -73,7 +74,7 @@ test('app source and example environment expose only approved public configurati
       return entry.isDirectory() ? sourceFiles(path) : /\.[jt]sx?$/.test(path) && !path.includes('.test.') ? [path] : [];
     });
   }
-  const source = [...sourceFiles(join(__dirname, '..')), join(__dirname, '../../.env.example'), join(__dirname, '../../app.config.js')]
+  const source = [...sourceFiles(join(__dirname, '..')), join(__dirname, '../../.env.example'), join(__dirname, '../../.env.production.example'), join(__dirname, '../../app.config.js')]
     .map((path) => readFileSync(path, 'utf8')).join('\n');
   const allowed = new Set([
     'EXPO_PUBLIC_APP_ENV', 'EXPO_PUBLIC_FIREBASE_API_KEY', 'EXPO_PUBLIC_FIREBASE_APP_ID',
@@ -114,4 +115,44 @@ test.each(['development', 'production'])('%s rejects the other cloud project', (
     EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: `${wrongProject}.firebaseapp.com`,
     EXPO_PUBLIC_FIREBASE_PROJECT_ID: wrongProject,
   })).toThrow(`${environment} requires Firebase project`);
+});
+
+
+test.each([undefined, '', '   ', 'preview'])('startup requires an explicit valid selector (%s), even with approved Firebase identifiers', (selector) => {
+  const environment: Record<string, string> = { ...developmentConfig };
+  if (selector === undefined) delete environment.EXPO_PUBLIC_APP_ENV;
+  else environment.EXPO_PUBLIC_APP_ENV = selector;
+  expect(() => loadConfig(environment)).toThrow('EXPO_PUBLIC_APP_ENV must be development or production');
+});
+
+test('the production example loads only the approved production web-app configuration', () => {
+  const example = readFileSync(join(__dirname, '../../.env.production.example'), 'utf8');
+  const environment = Object.fromEntries(example.split(/\r?\n/).filter((line) => line.startsWith('EXPO_PUBLIC_')).map((line) => {
+    const separator = line.indexOf('=');
+    return [line.slice(0, separator), line.slice(separator + 1)];
+  }));
+  const loaded = loadConfig(environment);
+  expect(loaded.appEnvironment).toBe('production');
+  expect(loaded.firebaseConfig).toEqual({ apiKey: 'AIzaSyC2oiAfio-kfIlMAksg7wSuEto0LZAU1yw',
+    authDomain: 'gamified-todo-prod-jellotheman.firebaseapp.com', projectId: 'gamified-todo-prod-jellotheman',
+    appId: '1:126696046144:web:9974e13bb62a0277e9a9a5' });
+  expect(example).not.toContain('EXPO_PUBLIC_RUN_DEVELOPMENT_SMOKE');
+});
+
+test.each([undefined, '', '   ', 'preview'])('Expo app identity also requires an explicit valid selector (%s)', (selector) => {
+  if (selector === undefined) delete process.env.EXPO_PUBLIC_APP_ENV;
+  else process.env.EXPO_PUBLIC_APP_ENV = selector;
+  const configure = jest.requireActual<(input: { config: object }) => object>('../../app.config.js');
+  expect(() => configure({ config: {} })).toThrow('EXPO_PUBLIC_APP_ENV must be development or production');
+});
+
+test.each([
+  ['development', 'Gamified Todo Dev', 'gamifiedtodo-dev', 'com.gamifiedtodo.app.dev'],
+  ['production', 'Gamified Todo', 'gamifiedtodo', 'com.gamifiedtodo.app'],
+])('explicit %s selects matching Expo app identities', (selector, name, scheme, identifier) => {
+  process.env.EXPO_PUBLIC_APP_ENV = selector;
+  const configure = jest.requireActual<(input: { config: object }) => object>('../../app.config.js');
+  expect(configure({ config: { slug: 'gamified-todo', android: { adaptiveIcon: 'retained' }, ios: { supportsTablet: true } } }))
+    .toEqual({ slug: 'gamified-todo', name, scheme, android: { adaptiveIcon: 'retained', package: identifier },
+      ios: { supportsTablet: true, bundleIdentifier: identifier } });
 });

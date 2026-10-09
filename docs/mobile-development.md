@@ -8,7 +8,7 @@ Copy-Item apps/mobile/.env.example apps/mobile/.env.local
 npm start
 ```
 
-On later sessions, run `npm start`. Preserve your existing `.env.local`; restart Metro after changing it. The example contains public configuration for the existing development Firebase project. Server credentials and tokens never belong in `EXPO_PUBLIC_*` variables.
+On later sessions, run `npm start`. Preserve your existing `.env.local`; restart Metro after changing it. The environment selector EXPO_PUBLIC_APP_ENV is required explicitly; both Expo app identity and Firebase startup reject missing, blank or unsupported values. Source promotion to main leaves the ongoing local .env.local development runtime unchanged. The example contains public configuration for the existing development Firebase project. Server credentials and tokens never belong in `EXPO_PUBLIC_*` variables.
 
 Install **SDK 57 Expo Go** on your phone:
 
@@ -60,3 +60,9 @@ Use SDK 57 Expo Go and the real development project. The user reported that the 
 8. Remove any marked device-test data. Record iPhone outcomes separately from mocked screen tests and development SDK/rules checks. Android remains pending too.
 
 Each section listens to a bounded window, initially 25 displayed tasks plus one lookahead. Explicit paging expands that section by 25 and replaces its listener; it does not accumulate stale cursor pages. All loaded records continue to receive realtime changes. Lists show only server-confirmed snapshots; while connectivity is unconfirmed, previously confirmed records may remain visible with a status message. A cold offline start cannot substitute cached data for confirmed loading. There is no durable offline outbox; unsaved input/draft recovery lasts within the current signed-in screen, not across a forced app shutdown.
+
+## Source promotion and runtime selection
+
+The same source is merged from dev to main and synced back into dev after authorized pushes and exact-commit CI verification. Firebase/runtime targeting is an explicit configuration choice: .env.example supplies the approved development set, while .env.production.example supplies the approved public production set as a reference. Expo does not automatically load either .example file. Leave the active local .env.local and running Metro session on development during source promotion. For a separately intended production runtime, supply the entire production configuration set explicitly in that runtime; mixing selectors or Firebase identifiers fails startup.
+
+Do not use NODE_ENV or the checked-out Git branch as the Firebase deployment target. Expo commands may force NODE_ENV=production for bundling without indicating a production backend. The repository has no automatic Firebase, hosting or native deployment from a main push; CI checks source with mocked Firebase and does not deploy or create production accounts/data. No cloud/native release is configured here. [Expo environment-variable guidance](https://docs.expo.dev/guides/environment-variables/) and [SDK 57 app configuration](https://docs.expo.dev/versions/v57.0.0/config/app/).

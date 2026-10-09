@@ -1,4 +1,4 @@
-export const appEnvironment = process.env.EXPO_PUBLIC_APP_ENV || 'development';
+export const appEnvironment = process.env.EXPO_PUBLIC_APP_ENV;
 if (appEnvironment !== 'development' && appEnvironment !== 'production') {
   throw new Error('EXPO_PUBLIC_APP_ENV must be development or production.');
 }

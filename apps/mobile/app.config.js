@@ -1,6 +1,6 @@
-// Local Expo Go defaults to the development environment.
+// The explicit runtime selector controls app identity independently of Git/NODE_ENV.
 module.exports = ({ config }) => {
-  const environment = process.env.EXPO_PUBLIC_APP_ENV || 'development';
+  const environment = process.env.EXPO_PUBLIC_APP_ENV;
   if (!['development', 'production'].includes(environment)) {
     throw new Error('EXPO_PUBLIC_APP_ENV must be development or production.');
   }

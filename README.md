@@ -10,7 +10,7 @@ Copy-Item apps/mobile/.env.example apps/mobile/.env.local
 npm start
 ```
 
-Copy the environment file only on first setup; it contains the existing development Firebase public configuration. Keep your computer and phone on the same Wi-Fi, then scan Metro's QR code with SDK 57 Expo Go. See [mobile development](docs/mobile-development.md) for Android and iPhone installation and troubleshooting.
+Copy the environment file only on first setup; it contains the existing development Firebase public configuration. EXPO_PUBLIC_APP_ENV must explicitly be development or production; missing/blank/unsupported selectors fail startup. Keep the active local .env.local set to development when promoting source to main. The public production reference is apps/mobile/.env.production.example. Keep your computer and phone on the same Wi-Fi, then scan Metro's QR code with SDK 57 Expo Go. See [mobile development](docs/mobile-development.md) for Android and iPhone installation and troubleshooting.
 
 Run `npm run check` before committing. GitHub Actions runs the same lint, TypeScript and mocked tests on `dev` and `main`; it does not deploy anything. Work on `dev`, verify its exact commit in Actions, merge it into production `main`, then sync `dev` from `main`.
 
@@ -37,4 +37,4 @@ git merge main
 git push origin dev
 ```
 
-Confirm Checks pass for both pushed branch tips.
+Confirm Checks pass for both pushed branch tips. This promotes the same source through dev and main; runtime Firebase selection comes from the explicit environment values, not the branch or NODE_ENV. A Git push performs no automatic Firebase, hosting or native deployment. Production runtime provisioning/deployment remains a separate explicit operation.
