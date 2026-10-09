@@ -18,7 +18,7 @@ function loadConfig(environment: Record<string, string> = {}) {
   return require('./firebase-config');
 }
 
-test('cloud development fails clearly when configuration is missing', () => {
+test('startup fails clearly when Firebase configuration is missing', () => {
   expect(() => loadConfig()).toThrow('requires a real apiKey');
 });
 
@@ -58,6 +58,9 @@ test.each([
   ['EXPO_PUBLIC_FIREBASE_PROJECT_ID', 'projectId'],
   ['EXPO_PUBLIC_FIREBASE_APP_ID', 'appId'],
 ])('%s rejects missing, blank, or demo configuration', (variable, field) => {
+  const missingConfig: Record<string, string> = { ...developmentConfig };
+  delete missingConfig[variable];
+  expect(() => loadConfig(missingConfig)).toThrow(`requires a real ${field}`);
   for (const value of ['', '   ', 'demo-placeholder']) {
     expect(() => loadConfig({ ...developmentConfig, [variable]: value }))
       .toThrow(`requires a real ${field}`);
