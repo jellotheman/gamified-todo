@@ -9,7 +9,7 @@ The approved minimal local plan supersedes the previous cloud release setup. The
 - [x] Final verification on Node 22.23.3: fresh `npm ci`, root lint/typecheck and 19 mocked tests passed; Expo dependency check and Doctor 21/21 passed. `npm start` served Metro and an Android development JavaScript bundle returned HTTP 200 (6,655,240 characters); verification server stopped. npm reported 81 audit findings (17 moderate, 64 high); no unrelated dependency upgrades applied.
 - [x] Coordinator inspected code, configuration, CI and documentation and authorized the verified commit/promotion.
 - [ ] Publish the verified dev commit and pass exact-SHA Checks; normal merge into main, sync main into dev, verify both branch Checks and clean matching tips. The final handoff records commit IDs and run links.
-- [ ] Physical Android/iPhone test: user scans QR code and confirms Hello World and optional smoke logs. Device test remains pending until actually performed.
+- [ ] Physical Android/iPhone test: user scans QR code and confirms the current authenticated task screen and optional smoke logs. Device test remains pending until actually performed.
 
 Online Firebase/EAS projects, GitHub secrets/variables and billing settings are outside this cleanup; no resources were created, deployed or deleted. Historical architecture ideas are recorded only as future options in `stack-research.md`.
 
@@ -24,3 +24,18 @@ Online Firebase/EAS projects, GitHub secrets/variables and billing settings are 
 - [ ] Physical Android/iPhone SDK 57 Expo Go identity, session restart and accessibility checks in `docs/mobile-development.md`. Both remain pending; the user plans Android testing later.
 
 Issue #2 remains open until device verification is completed.
+
+## Task-management milestone (#3)
+
+- [x] Replaced authenticated Hello World with accessible private capture, title editing, safeguarded deletion, complete/undo and explicit recovery controls. Uncertain capture retains one frozen draft ID/title for retries; pending submissions coalesce; desired-state completion preserves existing timestamps.
+- [x] Independently bounded active/history subscriptions: 25 displayed plus lookahead, explicit 25-task expansion, stable timestamp/document-ID ordering and complete live-window replacement. Account/sign-out/unmount purge screen state, unsubscribe and ignore late callbacks/saves. Cache/pending status never substitutes for server confirmation; deletion is an acknowledged transaction. No durable offline outbox or goal UI.
+- [x] Development active-task composite index deployed by coordinator and READY. Rules unchanged; production untouched. 15/15 actual repository/client SDK verification groups passed, including owner query/mutation/retry/order and denied stranger/guest/malformed operations; all marked documents and two temporary accounts cleaned, zero cleanup failures.
+- [x] Controlled screen tests cover capture/edit/delete/complete/undo/recomplete, retained failed input, stable retries, restored saved outcomes after remount, bounded paging/realtime replacement, status/retry, session purge and late responses. Focused tests and TypeScript passed; no new dependencies.
+- [x] Root npm run check passed after the review repair: lint, TypeScript and 55 tests across 8 suites. Standards review returned 0 findings; the Spec review found one stale section-membership issue, repaired with red/green saved-undo and symmetric saved-completion regressions. Fresh confirmed windows now determine duplicate-ID section membership; stale/error/cache windows cannot override the newer confirmed section.
+- [x] Coordinator inspected the repair and reran root npm run check: lint, TypeScript and 55/55 tests across 8 suites passed. Final read-only reviews returned Standards 0 and Spec 0 actionable findings. Ready for a local dev commit; not yet committed. No push authorized.
+- [ ] Full physical iPhone SDK 57 Expo Go saved-loop, restart, account isolation, offline recovery and VoiceOver/large-text checks in docs/mobile-development.md. The user confirms the live task loop works on Web and iPhone; the specific full-checklist outcomes remain unrecorded. Android verification also remains pending.
+
+- [x] Existing Metro returned an iOS development bundle with HTTP 200 (5,937,549 bytes), without restarting/stopping the user server. Bundle readiness does not establish native saved-loop behavior.
+- [x] Separate fresh browser session loaded both sections and saved a disposable task. Its one task, profile and third disposable account were cleaned; browser signed out. This browser evidence is separate from the 15 live SDK groups/two accounts and physical-device checklist.
+
+Issue #3 remains open until required device verification is completed. Earlier foundation/identity entries record their historical Hello World scope; the current screen is the task list.

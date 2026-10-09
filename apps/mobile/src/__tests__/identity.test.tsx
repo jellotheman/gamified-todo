@@ -6,6 +6,7 @@ import { auth } from '../lib/firebase';
 import { doc, onSnapshot, runTransaction } from 'firebase/firestore';
 import Index from '../app/index';
 
+jest.mock('../components/task-screen', () => () => null);
 jest.mock('../lib/firebase', () => ({ auth: { currentUser: null }, firestore: {} }));
 jest.mock('firebase/auth', () => ({
   onAuthStateChanged: jest.fn(), createUserWithEmailAndPassword: jest.fn(),
@@ -69,7 +70,7 @@ test('successful registration passes trimmed email and enters the observed authe
   });
   await fireEvent.press(screen.getByRole('button', { name: 'Register' }));
   expect(createUserWithEmailAndPassword).toHaveBeenCalledWith(auth, 'new@example.com', 'private-password');
-  expect(screen.getByText('Hello World')).toBeTruthy();
+  expect(screen.getByText('Your tasks')).toBeTruthy();
   expect(screen.queryByLabelText('Password')).toBeNull();
 });
 
@@ -127,7 +128,7 @@ test('password reset success and unknown email share a generic response; network
 test('account switching detaches private subscriptions and ignores stale private callbacks', async () => {
   await render(<Index />);
   await act(() => identityChanged(user('owner-a', 'first@example.com')));
-  expect(screen.getByText('Hello World')).toBeTruthy();
+  expect(screen.getByText('Your tasks')).toBeTruthy();
   expect(screen.getByText('Loading your private account…')).toBeTruthy();
   const staleCallback = profileChanged;
   await act(() => profileChanged({ ...mockProfile, metadata: { fromCache: false, hasPendingWrites: false } }));
@@ -147,7 +148,7 @@ test('sign out clears private state before acknowledgement and failure has acces
   let rejectSignOut: (error: unknown) => void = () => {};
   jest.mocked(signOut).mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectSignOut = reject; }));
   await fireEvent.press(screen.getByRole('button', { name: 'Sign out' }));
-  expect(screen.queryByText('Hello World')).toBeNull();
+  expect(screen.queryByText('Your tasks')).toBeNull();
   expect(screen.queryByText('first@example.com')).toBeNull();
   expect(mockStopSnapshot).toHaveBeenCalled();
   await act(() => rejectSignOut({ code: 'auth/network-request-failed' }));

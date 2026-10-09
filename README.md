@@ -1,6 +1,6 @@
 # Gamified Todo
 
-Expo SDK 57, TypeScript, Expo Router and Firebase. Register or sign in with email/password, reset your password and sign out. Sessions persist locally. The authenticated **Hello World** screen initializes a private profile; task features come later.
+Expo SDK 57, TypeScript, Expo Router and Firebase. Register or sign in with email/password, reset your password and sign out. Sessions persist locally. The authenticated task screen supports private capture, title editing, guarded deletion, completion and undo, with server-confirmed saves and paged active/completed lists. Daily goal UI comes later.
 
 Install Node.js 22.13 or newer. From the repository root in PowerShell:
 
@@ -16,7 +16,7 @@ Run `npm run check` before committing. GitHub Actions runs the same lint, TypeSc
 
 [Firebase configuration and manual rules deployment](docs/firebase-development.md) · [Implementation checklist](docs/implementation-checklist.md)
 
-Everyday changes start on `dev` and finish with checks, a commit and a push:
+Everyday changes start on `dev` and finish with checks and a local commit. Push only when the user explicitly instructs it; the following push/promotion workflow requires that authorization:
 
 ```powershell
 git switch dev

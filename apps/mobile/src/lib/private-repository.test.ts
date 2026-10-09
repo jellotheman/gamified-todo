@@ -10,7 +10,7 @@ jest.mock('firebase/firestore', () => ({
   collection: jest.fn((_db, ...path: string[]) => path.join('/')),
   doc: jest.fn((_db, ...path: string[]) => ({ path: path.join('/'), id: 'generated-id' })),
   runTransaction: jest.fn(), serverTimestamp: jest.fn(() => 'SERVER_TIME'),
-  deleteDoc: jest.fn(), onSnapshot: jest.fn(), query: jest.fn(() => ({ type: 'query' })), orderBy: jest.fn(), limit: jest.fn(),
+  documentId: jest.fn(() => '__name__'), where: jest.fn(), Timestamp: class {}, onSnapshot: jest.fn(), query: jest.fn(() => ({ type: 'query' })), orderBy: jest.fn(), limit: jest.fn(),
 }));
 
 const get = jest.fn<() => Promise<{ exists: () => boolean; data: () => Record<string, unknown> }>>();
@@ -75,10 +75,10 @@ test('private subscriptions use bounded owner queries and detach on identity cha
   const stopSnapshot = jest.fn();
   jest.mocked(onSnapshot).mockReturnValueOnce(stopSnapshot);
   const repository = privateRepository('owner-a');
-  repository.subscribeTasks(jest.fn(), jest.fn());
-  expect(query).toHaveBeenCalledWith('users/owner-a/tasks', undefined, undefined);
+  repository.subscribeTaskWindow('active', 25, jest.fn(), jest.fn(), jest.fn());
+  expect(query).toHaveBeenCalledWith('users/owner-a/tasks', undefined, undefined, undefined, undefined);
   expect(orderBy).toHaveBeenCalledWith('createdAt', 'desc');
-  expect(limit).toHaveBeenCalledWith(50);
+  expect(limit).toHaveBeenCalledWith(26);
   const listener = jest.mocked(onAuthStateChanged).mock.calls[0][1];
   if (typeof listener !== 'function') throw new Error('Expected identity listener');
   listener(null);
@@ -99,4 +99,34 @@ test('a submitted task has one owner-private identity across uncertain save retr
   expect(set).not.toHaveBeenCalled();
   expect(doc).toHaveBeenLastCalledWith(expect.anything(), 'users', 'owner-a', 'tasks', draft.id);
   expect(serverTimestamp).toHaveBeenCalled();
+});
+
+test('deletion is an acknowledged transaction and remains retryable offline', async () => {
+  const remove = jest.fn();
+  jest.mocked(runTransaction).mockImplementationOnce(async (_db, callback) => callback({ get, delete: remove } as unknown as Parameters<typeof callback>[0]));
+  get.mockResolvedValueOnce({ exists: () => true, data: () => ({}) });
+  await privateRepository('owner-a').deleteTask('task-1');
+  expect(remove).toHaveBeenCalledWith(expect.objectContaining({ path: 'users/owner-a/tasks/task-1' }));
+  jest.mocked(runTransaction).mockRejectedValueOnce(new Error('offline'));
+  await expect(privateRepository('owner-a').deleteTask('task-1')).rejects.toThrow('offline');
+});
+
+test('section windows are bounded with deterministic order and report unconfirmed cache without exposing local writes', () => {
+  const next = jest.fn();
+  const status = jest.fn();
+  const repository = privateRepository('owner-a');
+  repository.subscribeTaskWindow('active', 25, next, jest.fn(), status);
+  const receive = jest.mocked(onSnapshot).mock.calls[0][2] as (snapshot: unknown) => void;
+  receive({ docs: [], metadata: { fromCache: true, hasPendingWrites: false } });
+  expect(status).toHaveBeenLastCalledWith('cached');
+  expect(next).not.toHaveBeenCalled();
+  receive({ docs: [], metadata: { fromCache: false, hasPendingWrites: true } });
+  expect(status).toHaveBeenLastCalledWith('pending');
+  expect(next).not.toHaveBeenCalled();
+  receive({ docs: [], metadata: { fromCache: false, hasPendingWrites: false } });
+  expect(next).toHaveBeenLastCalledWith({ tasks: [], hasMore: false });
+  expect(limit).toHaveBeenCalledWith(26);
+  repository.subscribeTaskWindow('completed', 50, next, jest.fn(), status);
+  expect(limit).toHaveBeenLastCalledWith(51);
+  expect(orderBy).toHaveBeenCalledWith('completedAt', 'desc');
 });

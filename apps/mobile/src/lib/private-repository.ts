@@ -1,6 +1,6 @@
 import { onAuthStateChanged } from 'firebase/auth';
 import {
-  collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, Timestamp,
+  collection, doc, documentId as firestoreDocumentId, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, Timestamp, where,
   type DocumentReference, type DocumentSnapshot, type Query, type QuerySnapshot,
 } from 'firebase/firestore';
 import { auth, firestore } from './firebase';
@@ -9,6 +9,9 @@ export const DEFAULT_DAILY_GOAL = 3;
 export interface Profile { dailyGoal: number }
 export interface Task { id: string; title: string; createdAt: Timestamp; completedAt: Timestamp | null }
 export interface TaskDraft { readonly id: string; readonly title: string }
+export type TaskSection = 'active' | 'completed';
+export type ListStatus = 'confirmed' | 'cached' | 'pending';
+export interface TaskWindow { tasks: Task[]; hasMore: boolean }
 
 function titleValue(title: string) {
   const trimmed = title.trim();
@@ -52,7 +55,7 @@ export function privateRepository(uid: string) {
   const task = (id: string) => doc(firestore, 'users', uid, 'tasks', documentId(id));
 
   function observe<T>(source: Query | DocumentReference, decode: (snapshot: QuerySnapshot | DocumentSnapshot) => T,
-    next: (value: T) => void, error: (error: unknown) => void) {
+    next: (value: T) => void, error: (error: unknown) => void, status?: (status: ListStatus) => void) {
     requireOwner();
     let active = true;
     let stopSnapshot = () => {};
@@ -60,7 +63,9 @@ export function privateRepository(uid: string) {
     const stop = () => { active = false; stopSnapshot(); stopAuth(); };
     stopAuth = onAuthStateChanged(auth, (user) => { if (user?.uid !== uid) stop(); });
     const receive = (snapshot: QuerySnapshot | DocumentSnapshot) => {
-      if (!active || auth.currentUser?.uid !== uid || snapshot.metadata.hasPendingWrites || snapshot.metadata.fromCache) return;
+      if (!active || auth.currentUser?.uid !== uid) return;
+      status?.(snapshot.metadata.hasPendingWrites ? 'pending' : snapshot.metadata.fromCache ? 'cached' : 'confirmed');
+      if (snapshot.metadata.hasPendingWrites || snapshot.metadata.fromCache) return;
       try { next(decode(snapshot)); } catch (reason) { error(reason); }
     };
     const fail = (reason: unknown) => { if (active && auth.currentUser?.uid === uid) error(reason); };
@@ -117,15 +122,27 @@ export function privateRepository(uid: string) {
     },
     async deleteTask(id: string) {
       requireOwner();
-      await deleteDoc(task(id));
+      const reference = task(id);
+      await runTransaction(firestore, async (transaction) => {
+        requireOwner();
+        const current = await transaction.get(reference);
+        requireOwner();
+        if (current.exists()) transaction.delete(reference);
+      });
       requireOwner();
     },
-    subscribeTasks(next: (tasks: Task[]) => void, error: (error: unknown) => void) {
-      // Foundation only: ticket #3 adds separate active/history paging queries.
-      return observe(query(tasks, orderBy('createdAt', 'desc'), limit(50)), (snapshot) => {
+    subscribeTaskWindow(section: TaskSection, size: number, next: (window: TaskWindow) => void,
+      error: (error: unknown) => void, status: (status: ListStatus) => void) {
+      if (!Number.isSafeInteger(size) || size < 1) throw new Error('Invalid task window.');
+      // Reobserve the complete bounded window on expansion, rather than appending stale
+      // cursor pages. Realtime moves/deletes/recompletion cannot leave gaps or duplicates.
+      const source = section === 'active'
+        ? query(tasks, where('completedAt', '==', null), orderBy('createdAt', 'desc'), orderBy(firestoreDocumentId(), 'desc'), limit(size + 1))
+        : query(tasks, where('completedAt', '>', new Timestamp(0, 0)), orderBy('completedAt', 'desc'), orderBy(firestoreDocumentId(), 'desc'), limit(size + 1));
+      return observe(source, (snapshot) => {
         if (!('docs' in snapshot)) throw new Error('Invalid task snapshot.');
-        return snapshot.docs.map(taskValue);
-      }, next, error);
+        return { tasks: snapshot.docs.slice(0, size).map(taskValue), hasMore: snapshot.docs.length > size };
+      }, next, error, status);
     },
     async ensureProfile() {
       requireOwner();

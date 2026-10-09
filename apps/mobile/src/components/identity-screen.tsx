@@ -5,6 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authMessage, identity, type Identity } from '../lib/identity';
 import { privateRepository } from '../lib/private-repository';
+import TaskScreen from './task-screen';
 
 function Action({ title, onPress, disabled = false }: { title: string; onPress: () => void; disabled?: boolean }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={title}
@@ -86,6 +87,7 @@ function AuthForm() {
 }
 
 function PrivateAccount({ user, onLeave }: { user: Identity; onLeave: () => void }) {
+  const [repository, setRepository] = useState<ReturnType<typeof privateRepository> | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -97,17 +99,18 @@ function PrivateAccount({ user, onLeave }: { user: Identity; onLeave: () => void
       const repository = privateRepository(user.uid);
       void repository.ensureProfile().then(() => {
         if (!active) return;
-        stop = repository.subscribeProfile(() => { if (active) { setReady(true); setError(''); } }, fail);
+        stop = repository.subscribeProfile(() => { if (active) { setRepository(repository); setReady(true); setError(''); } }, fail);
       }).catch(fail);
     } catch { fail(); }
     return () => { active = false; stop(); };
   }, [user.uid, attempt]);
   return <View style={styles.panel}>
-    <Text accessibilityRole="header" style={styles.heading}>Hello World</Text>
+    <Text accessibilityRole="header" style={styles.heading}>Your tasks</Text>
     <Text style={styles.copy}>{user.email}</Text>
     {error ? <><Notice text={error} /><Action title="Retry account loading" onPress={() => { setReady(false); setError(''); setAttempt(attempt + 1); }} /></>
       : <Text accessibilityLiveRegion="polite" style={styles.copy}>{ready ? 'Your private account is ready.' : 'Loading your private account…'}</Text>}
     <Action title="Sign out" onPress={onLeave} />
+    {ready && repository ? <TaskScreen key={user.uid} repository={repository} /> : null}
   </View>;
 }
 
@@ -162,7 +165,7 @@ export default function IdentityScreen() {
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: '#fff' },
-  container: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+  container: { flexGrow: 1, padding: 24 },
   panel: { width: '100%', maxWidth: 440, alignSelf: 'center', gap: 12 },
   heading: { color: '#15251c', fontSize: 28, fontWeight: '700', marginBottom: 12 },
   label: { color: '#15251c', fontSize: 16, fontWeight: '600' },
