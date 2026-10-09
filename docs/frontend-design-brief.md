@@ -190,3 +190,5 @@ Relative effort: a token/font/control pass is modest; adapting every recovery/mo
 
 
 Implementation follow-up: the user later explicitly requested pixel typography throughout. Pixelify principal headings plus VT323 body/controls now supersede this discussion draft's system-body recommendation; exact provenance and fallback behavior are recorded in frontend-resources.md.
+
+Latest typography refinement: Pixelify Sans Medium replaces the thin VT323 body font, retaining Pixelify SemiBold headings. This supersedes the preceding VT323 amendment without changing layout or behavior.

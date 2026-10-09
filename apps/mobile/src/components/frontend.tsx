@@ -9,12 +9,12 @@ export const theme = { ...MD3DarkTheme, roundness: 1, animation: { scale: 0 }, c
 const FontReady = createContext({ heading: false, body: false });
 export function BodyText(props: ComponentProps<typeof Text>) {
   const { body } = useContext(FontReady);
-  return <Text {...props} style={[props.style, body && { fontFamily: 'VT323', fontWeight: 'normal' }]} />;
+  return <Text {...props} style={[props.style, body && { fontFamily: 'PixelifyMedium', fontWeight: 'normal' }]} />;
 }
 export function FrontendProvider({ children }: { children: ReactNode }) {
   const [headingLoaded] = useFonts({ PixelifySemiBold: require('../../assets/fonts/PixelifySans-SemiBold.ttf') });
-  const [bodyLoaded] = useFonts({ VT323: require('../../assets/fonts/VT323-Regular.ttf') });
-  const paperTheme = { ...theme, fonts: Object.fromEntries(Object.entries(theme.fonts).map(([key, value]) => [key, { ...value, ...(bodyLoaded ? { fontFamily: 'VT323', fontWeight: 'normal' } : {}) }])) as typeof theme.fonts };
+  const [bodyLoaded] = useFonts({ PixelifyMedium: require('../../assets/fonts/PixelifySans-Medium.ttf') });
+  const paperTheme = { ...theme, fonts: Object.fromEntries(Object.entries(theme.fonts).map(([key, value]) => [key, { ...value, ...(bodyLoaded ? { fontFamily: 'PixelifyMedium', fontWeight: 'normal' } : {}) }])) as typeof theme.fonts };
   return <FontReady.Provider value={{ heading: headingLoaded, body: bodyLoaded }}><PaperProvider theme={paperTheme} settings={{ icon: (props) => <MaterialDesignIcons {...props} name={props.name as React.ComponentProps<typeof MaterialDesignIcons>['name']} /> }}>{children}</PaperProvider></FontReady.Provider>;
 }
 export function PageHeading({ children }: { children: string }) {
@@ -36,8 +36,8 @@ export function Action({ title, text = title, onPress, disabled = false, busy = 
 }
 export const Field = forwardRef<NativeTextInput, ComponentProps<typeof TextInput>>(function Field(props, ref) {
   const { body } = useContext(FontReady);
-  return <TextInput {...props} ref={ref} theme={{ ...theme, fonts: Object.fromEntries(Object.entries(theme.fonts).map(([key, value]) => [key, { ...value, ...(body ? { fontFamily: 'VT323', fontWeight: 'normal' } : {}) }])) as typeof theme.fonts }}
-    style={[props.style, { fontSize: 22, lineHeight: 28 }, body && { fontFamily: 'VT323', fontWeight: 'normal' }]} contentStyle={[props.contentStyle, body && { fontFamily: 'VT323', fontWeight: 'normal' }]} />;
+  return <TextInput {...props} ref={ref} theme={{ ...theme, fonts: Object.fromEntries(Object.entries(theme.fonts).map(([key, value]) => [key, { ...value, ...(body ? { fontFamily: 'PixelifyMedium', fontWeight: 'normal' } : {}) }])) as typeof theme.fonts }}
+    style={[props.style, { fontSize: 22, lineHeight: 28 }, body && { fontFamily: 'PixelifyMedium', fontWeight: 'normal' }]} contentStyle={[props.contentStyle, body && { fontFamily: 'PixelifyMedium', fontWeight: 'normal' }]} />;
 });
 export const fieldProps: Partial<ComponentProps<typeof TextInput>> = {
   theme, mode: 'outlined', outlineColor: colors.secondary, activeOutlineColor: colors.gold, textColor: colors.ink,
