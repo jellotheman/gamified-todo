@@ -1,6 +1,6 @@
 # Gamified Todo
 
-Expo SDK 57, TypeScript, Expo Router and Firebase, with one **Hello World** screen. Firebase Auth, Firestore and local storage are wired; task features come later.
+Expo SDK 57, TypeScript, Expo Router and Firebase. Register or sign in with email/password, reset your password and sign out. Sessions persist locally. The authenticated **Hello World** screen initializes a private profile; task features come later.
 
 Install Node.js 22.13 or newer. From the repository root in PowerShell:
 

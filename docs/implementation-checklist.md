@@ -12,3 +12,15 @@ The approved minimal local plan supersedes the previous cloud release setup. The
 - [ ] Physical Android/iPhone test: user scans QR code and confirms Hello World and optional smoke logs. Device test remains pending until actually performed.
 
 Online Firebase/EAS projects, GitHub secrets/variables and billing settings are outside this cleanup; no resources were created, deployed or deleted. Historical architecture ideas are recorded only as future options in `stack-research.md`.
+
+## Identity milestone (#2)
+
+- [x] Email/password registration, sign-in, generic password-reset response, persistent-session gate and recoverable sign-out; authenticated Hello World retained.
+- [x] Owner-scoped task/profile repository and exact-schema rules with private goal default 3, bounds 1–20. Approved API key/domain/app ID checks strengthen project isolation independently of `__DEV__`; no login credentials or startup seeding bundled.
+- [x] Development email/password enabled; ordinary private test account nicknamed `admin` provisioned with user-chosen password and no elevated privileges. Owner confirmed a fresh reset link worked.
+- [x] Firebase compiler accepted rules; coordinator explicitly deployed rules/indexes to development. 53/53 live client ID-token checks passed; marked documents and temporary accounts cleaned up. Production untouched.
+- [x] Coordinator final review: Standards 0 findings, Spec 0 findings. Root `npm run check` passed lint, TypeScript and 43 tests across 6 suites on Node 24.15.0. Ready for local `dev` commit; no push.
+- [x] `npm start` served an Android development JavaScript bundle with HTTP 200 (6,655,437 bytes). Verification server stopped. This is bundling evidence, not physical device evidence.
+- [ ] Physical Android/iPhone SDK 57 Expo Go identity, session restart and accessibility checks in `docs/mobile-development.md`. Both remain pending; the user plans Android testing later.
+
+Issue #2 remains open until device verification is completed.

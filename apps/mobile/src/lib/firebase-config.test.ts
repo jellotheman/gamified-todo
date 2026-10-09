@@ -1,4 +1,6 @@
 import { afterEach, expect, jest, test } from '@jest/globals';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 const originalEnvironment = { ...process.env };
 
@@ -23,8 +25,8 @@ test('startup fails clearly when Firebase configuration is missing', () => {
 });
 
 const developmentConfig = {
-  EXPO_PUBLIC_FIREBASE_API_KEY: 'public-test-key',
-  EXPO_PUBLIC_FIREBASE_APP_ID: 'public-test-app',
+  EXPO_PUBLIC_FIREBASE_API_KEY: 'AIzaSyDnZnOchr8UCw3LXSfWSw0DKqahYaChDG0',
+  EXPO_PUBLIC_FIREBASE_APP_ID: '1:1062431403819:web:5af6597c61fcbc39b6df6e',
   EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: 'gamified-todo-dev-jellotheman.firebaseapp.com',
   EXPO_PUBLIC_FIREBASE_PROJECT_ID: 'gamified-todo-dev-jellotheman',
 };
@@ -40,11 +42,47 @@ test('production accepts its own Firebase project', () => {
   const config = loadConfig({
     ...developmentConfig,
     EXPO_PUBLIC_APP_ENV: 'production',
+    EXPO_PUBLIC_FIREBASE_API_KEY: 'AIzaSyC2oiAfio-kfIlMAksg7wSuEto0LZAU1yw',
+    EXPO_PUBLIC_FIREBASE_APP_ID: '1:126696046144:web:9974e13bb62a0277e9a9a5',
     EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: `${projectId}.firebaseapp.com`,
     EXPO_PUBLIC_FIREBASE_PROJECT_ID: projectId,
   });
   expect(config.appEnvironment).toBe('production');
   expect(config.firebaseConfig.projectId).toBe(projectId);
+});
+
+test.each(['EXPO_PUBLIC_FIREBASE_API_KEY', 'EXPO_PUBLIC_FIREBASE_APP_ID', 'EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN'])(
+  'mixed-project %s cannot authenticate against a different account store', (field) => {
+    expect(() => loadConfig({ ...developmentConfig, [field]: 'other-project-value' })).toThrow('development requires Firebase');
+  },
+);
+
+test('production rejects a development Auth API key despite a valid production project ID', () => {
+  expect(() => loadConfig({
+    ...developmentConfig, EXPO_PUBLIC_APP_ENV: 'production',
+    EXPO_PUBLIC_FIREBASE_PROJECT_ID: 'gamified-todo-prod-jellotheman',
+    EXPO_PUBLIC_FIREBASE_APP_ID: '1:126696046144:web:9974e13bb62a0277e9a9a5',
+    EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: 'gamified-todo-prod-jellotheman.firebaseapp.com',
+  })).toThrow('production requires Firebase apiKey');
+});
+
+test('app source and example environment expose only approved public configuration, never account credentials', () => {
+  function sourceFiles(directory: string): string[] {
+    return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+      const path = join(directory, entry.name);
+      return entry.isDirectory() ? sourceFiles(path) : /\.[jt]sx?$/.test(path) && !path.includes('.test.') ? [path] : [];
+    });
+  }
+  const source = [...sourceFiles(join(__dirname, '..')), join(__dirname, '../../.env.example'), join(__dirname, '../../app.config.js')]
+    .map((path) => readFileSync(path, 'utf8')).join('\n');
+  const allowed = new Set([
+    'EXPO_PUBLIC_APP_ENV', 'EXPO_PUBLIC_FIREBASE_API_KEY', 'EXPO_PUBLIC_FIREBASE_APP_ID',
+    'EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN', 'EXPO_PUBLIC_FIREBASE_PROJECT_ID', 'EXPO_PUBLIC_RUN_DEVELOPMENT_SMOKE',
+  ]);
+  const publicVariables = source.match(/EXPO_PUBLIC_[A-Z0-9_]+/g) ?? [];
+  expect(publicVariables.filter((name) => !allowed.has(name))).toEqual([]);
+  // Development account login must always come from user-entered inputs.
+  expect(source).not.toMatch(/(?:signInWithEmailAndPassword|createUserWithEmailAndPassword)\(auth,\s*['"]/);
 });
 
 test('an unsupported environment fails clearly', () => {

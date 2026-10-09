@@ -1,8 +1,53 @@
 rules_version = '2';
+// Assumed private data model (ownership is the path UID, never a mutable field):
+// users/{uid}/tasks/{taskId}: exactly title (trimmed string, 1–200 characters),
+// createdAt (immutable request-time timestamp), completedAt (null or timestamp).
+// New tasks start active. Completion is null -> request.time; undo -> null;
+// edits/already-completed requests preserve the previous completion timestamp.
+// users/{uid}/profile/settings: exactly dailyGoal (integer, 1–20; default 3).
+// No user root document or parent profile is needed to own a task collection.
+// No public profile, roles, counters or cross-account references exist.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+    function isAuthenticated() { return request.auth != null; }
+    function isOwner(uid) { return isAuthenticated() && request.auth.uid == uid; }
+    // Ownership is expressed by the immutable path; reject injected UID fields.
+    function uidUnchanged(data) { return !data.keys().hasAny(['uid', 'ownerId']); }
+    function uidNotModified() { return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid', 'ownerId']); }
+    function validTitle(title) {
+      // RE2 edge class includes JavaScript trim's non-ASCII whitespace.
+      let edge = '[^\\s\\x{00A0}\\x{1680}\\x{2000}-\\x{200A}\\x{2028}\\x{2029}\\x{202F}\\x{205F}\\x{3000}\\x{FEFF}]';
+      return title is string && title.size() >= 1 && title.size() <= 200
+        && title.matches('^' + edge + '([\\s\\S]*' + edge + ')?$');
     }
+    function isValidTask(data) {
+      return data.keys().hasAll(['title', 'createdAt', 'completedAt'])
+        && data.keys().hasOnly(['title', 'createdAt', 'completedAt'])
+        && uidUnchanged(data) && validTitle(data.title)
+        && data.createdAt is timestamp
+        && (data.completedAt == null || data.completedAt is timestamp);
+    }
+    function validCompletionTransition() {
+      return request.resource.data.completedAt == resource.data.completedAt
+        || (resource.data.completedAt == null && request.resource.data.completedAt == request.time)
+        || (resource.data.completedAt is timestamp && request.resource.data.completedAt == null);
+    }
+    function isValidProfile(data) {
+      return data.keys().hasAll(['dailyGoal']) && data.keys().hasOnly(['dailyGoal'])
+        && uidUnchanged(data) && data.dailyGoal is int && data.dailyGoal >= 1 && data.dailyGoal <= 20;
+    }
+    match /users/{uid}/tasks/{taskId} {
+      allow read, delete: if isOwner(uid);
+      allow create: if isOwner(uid) && isValidTask(request.resource.data)
+        && request.resource.data.createdAt == request.time && request.resource.data.completedAt == null;
+      allow update: if isOwner(uid) && isValidTask(request.resource.data) && uidNotModified()
+        && request.resource.data.createdAt == resource.data.createdAt && validCompletionTransition();
+    }
+    match /users/{uid}/profile/settings {
+      allow read, delete: if isOwner(uid);
+      allow create: if isOwner(uid) && isValidProfile(request.resource.data);
+      allow update: if isOwner(uid) && isValidProfile(request.resource.data) && uidNotModified();
+    }
+    match /{document=**} { allow read, write: if false; }
   }
 }
