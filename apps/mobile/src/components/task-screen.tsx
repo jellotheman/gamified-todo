@@ -1,16 +1,13 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, AccessibilityInfo, findNodeHandle } from 'react-native';
+import { Checkbox } from 'react-native-paper';
+import { Action, Field, fieldProps, colors, ui, Loading } from './frontend';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { privateRepository, Task, TaskDraft, TaskSection, TaskWindow, ListStatus } from '../lib/private-repository';
 
 type Repository = ReturnType<typeof privateRepository>;
 const PAGE_SIZE = 25;
-function TaskAction({ title, text = title, onPress, disabled = false }: { title: string; text?: string; onPress: () => void; disabled?: boolean }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled }}
-    disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.button, { opacity: disabled ? 0.5 : pressed ? 0.7 : 1 }]}>
-    <Text style={styles.buttonText}>{text}</Text>
-  </Pressable>;
-}
+const TaskAction = Action;
 function ErrorNotice({ children }: { children: string }) {
   return <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.error}>{children}</Text>;
 }
@@ -40,10 +37,32 @@ export default function TaskScreen({ repository }: { repository: Repository }) {
   const [title, setTitle] = useState('');
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
-  const [dialog, setDialog] = useState<{ kind: 'edit' | 'delete'; task: Task; title: string } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: 'actions' | 'edit' | 'delete'; task: Task; title: string } | null>(null);
   const [dialogError, setDialogError] = useState('');
   const [dialogPending, setDialogPending] = useState(false);
   const dialogBusy = useRef(false);
+  const origins = useRef<Record<string, View | null>>({});
+  const dialogHeading = useRef<View>(null);
+  const composer = useRef<TextInput>(null);
+  function focus(node: { focus?: () => void } | View | Text | null | undefined) {
+    if (!node) return;
+    if (Platform.OS === 'web') (node as unknown as { focus?: () => void }).focus?.();
+    else { const handle = findNodeHandle(node as View); if (handle) AccessibilityInfo.setAccessibilityFocus(handle); }
+  }
+  function closeDialog(afterDelete = false) {
+    if (dialogBusy.current) return;
+    const id = dialog?.task.id;
+    setDialog(null); setDialogError('');
+    requestAnimationFrame(() => {
+      if (!alive.current) return;
+      const origin = !afterDelete && id ? origins.current[id] : null;
+      if (origin) focus(origin); else composer.current?.focus();
+    });
+  }
+  function openDialog(kind: 'actions' | 'edit' | 'delete', task: Task) {
+    setDialogError(''); setDialog({ kind, task, title: task.title });
+  }
+
   const [completions, setCompletions] = useState<Record<string, { task: Task; desired: boolean; pending: boolean }>>({});
   const completionBusy = useRef(new Set<string>());
   const [draft, setDraft] = useState<TaskDraft | null>(null);
@@ -74,7 +93,7 @@ export default function TaskScreen({ repository }: { repository: Repository }) {
     try {
       if (dialog.kind === 'edit') await repository.renameTask(dialog.task.id, trimmed);
       else await repository.deleteTask(dialog.task.id);
-      if (alive.current) setDialog(null);
+      if (alive.current) { dialogBusy.current = false; closeDialog(dialog.kind === 'delete'); }
     } catch { if (alive.current) setDialogError('Unable to confirm this change was saved. Check your connection and retry.'); }
     finally { dialogBusy.current = false; if (alive.current) setDialogPending(false); }
   }
@@ -90,29 +109,37 @@ export default function TaskScreen({ repository }: { repository: Repository }) {
     } finally { completionBusy.current.delete(task.id); }
   }
   return <View style={styles.panel}>
-    <Text style={styles.copy}>Make room for what matters. Start with one small task.</Text>
-    <TextInput accessibilityLabel="New task title" placeholder="What would you like to do?" value={title}
-      onChangeText={setTitle} editable={!pending && !draft} returnKeyType="done" onSubmitEditing={() => void add()} style={styles.input} />
+    <View style={ui.frame}>
+    <Field ref={composer} {...fieldProps} label="Task title" accessibilityLabel="Task title" placeholder="What would you like to do?" value={title}
+      onChangeText={setTitle} editable={!pending && !draft} returnKeyType="done" onSubmitEditing={() => void add()} />
     <Text style={styles.copy}>Use a title with 1–200 characters.</Text>
     {error ? <ErrorNotice>{error}</ErrorNotice> : null}
-    {pending ? <Text accessibilityLiveRegion="polite">Saving task… Waiting for server confirmation.</Text> : null}
+    {pending ? <Loading text="Saving task… Waiting for server confirmation." /> : null}
     {draft && !pending ? <Text style={styles.copy}>Retry saves the original submitted title. Your draft is kept until confirmed.</Text> : null}
-    <TaskAction title={draft && !pending ? 'Retry adding task' : 'Add task'} disabled={pending} onPress={() => void add()} />
-    {dialog ? <Modal visible animationType="slide" onRequestClose={() => { if (!dialogBusy.current) { setDialog(null); setDialogError(''); } }}>
-      <SafeAreaView style={styles.modalPage}><KeyboardAvoidingView style={styles.modalPage} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}><View accessibilityViewIsModal style={styles.row}>
-      <Text accessibilityRole="header" style={styles.taskTitle}>{dialog.kind === 'edit' ? 'Edit task' : 'Delete this task?'}</Text>
-      {dialog.kind === 'edit' ? <TextInput autoFocus accessibilityLabel="Edit task title" value={dialog.title} editable={!dialogPending}
-        onChangeText={(title) => { setDialog({ ...dialog, title }); setDialogError(''); }} returnKeyType="done" onSubmitEditing={() => void saveDialog()} style={styles.input} />
-        : <Text style={styles.copy}>{dialog.task.title}{'\n'}This permanently removes the task. You can keep it instead.</Text>}
+    <TaskAction title={draft && !pending ? 'Retry adding task' : 'Add task'} primary busy={pending} disabled={pending} onPress={() => void add()} />
+    </View>
+    {dialog ? <Modal visible animationType="none" onShow={() => { if (dialog.kind !== 'edit') focus(dialogHeading.current); }} onRequestClose={() => closeDialog(false)}>
+      <SafeAreaView style={ui.page}><KeyboardAvoidingView style={ui.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.container}><View accessibilityViewIsModal style={ui.panel}>
+      <View ref={dialogHeading} tabIndex={-1}><Text accessibilityRole="header" style={ui.heading}>{dialog.kind === 'edit' ? 'Edit task' : dialog.kind === 'actions' ? 'Task actions' : 'Delete this task?'}</Text></View>
+      {dialog.kind === 'edit' ? <Field {...fieldProps} autoFocus label="Edit task title" accessibilityLabel="Edit task title" value={dialog.title} editable={!dialogPending}
+        onChangeText={(title) => { setDialog({ ...dialog, title }); setDialogError(''); }} returnKeyType="done" onSubmitEditing={() => void saveDialog()} />
+        : <Text style={styles.taskTitle}>{dialog.task.title}</Text>}
+      {dialog.kind === 'delete' ? <Text style={styles.copy}>This permanently removes the task. You can keep it instead.</Text> : null}
       {dialogError ? <ErrorNotice>{dialogError}</ErrorNotice> : null}
-      {dialogPending ? <Text accessibilityLiveRegion="polite">Saving change… Waiting for server confirmation.</Text> : null}
-      <TaskAction title={dialog.kind === 'edit' ? dialogError ? 'Retry saving title' : 'Save title' : dialogError ? 'Retry deletion' : 'Confirm deletion'}
-        disabled={dialogPending} onPress={() => void saveDialog()} />
-      <TaskAction title={dialog.kind === 'edit' ? 'Cancel editing' : 'Keep task'} disabled={dialogPending} onPress={() => { setDialog(null); setDialogError(''); }} />
+      {dialogPending ? <Loading text="Saving change… Waiting for server confirmation." /> : null}
+      {dialog.kind === 'actions' ? <>
+        <TaskAction title="Edit task" onPress={() => openDialog('edit', dialog.task)} />
+        <TaskAction title="Delete task" danger onPress={() => openDialog('delete', dialog.task)} />
+        <TaskAction title="Cancel" onPress={() => closeDialog(false)} />
+      </> : <>
+      <TaskAction title={dialog.kind === 'edit' ? dialogError ? 'Retry saving title' : 'Save changes' : dialogError ? 'Retry deletion' : 'Delete task'}
+        primary={dialog.kind === 'edit'} danger={dialog.kind === 'delete'} busy={dialogPending} disabled={dialogPending} onPress={() => void saveDialog()} />
+      <TaskAction title={dialog.kind === 'edit' ? 'Cancel' : 'Keep task'} disabled={dialogPending} onPress={() => closeDialog(false)} />
+      </>}
     </View></ScrollView></KeyboardAvoidingView></SafeAreaView></Modal> : null}
     {Object.values(completions).map((operation) => <View key={operation.task.id} style={styles.panel}>
-      {operation.pending ? <Text accessibilityLiveRegion="polite">Saving completion for {operation.task.title}… Waiting for server confirmation.</Text>
+      {operation.pending ? <Text style={styles.copy} accessibilityLiveRegion="polite">Saving completion for {operation.task.title}… Waiting for server confirmation.</Text>
         : <><ErrorNotice>{`Unable to confirm completion change for ${operation.task.title}. Check your connection and retry.`}</ErrorNotice>
           <TaskAction title={`Retry completion for ${operation.task.title}`} onPress={() => void complete(operation.task, operation.desired)} /></>}
     </View>)}
@@ -125,18 +152,26 @@ export default function TaskScreen({ repository }: { repository: Repository }) {
       const tasks = list.window?.tasks.filter((task) => newer || !other.window?.tasks.some((otherTask) => otherTask.id === task.id)) ?? [];
       return <View key={section} style={styles.panel}>
         <Text accessibilityRole="header" style={styles.heading}>{section === 'active' ? 'Active' : 'Completed'}</Text>
-        {list.status === 'loading' ? <Text accessibilityLiveRegion="polite">Loading {section} tasks…</Text> : null}
-        {list.status === 'cached' ? <Text accessibilityLiveRegion="polite">Connection not confirmed. Showing last confirmed {section} tasks, if available.</Text> : null}
-        {list.status === 'pending' ? <Text accessibilityLiveRegion="polite">Waiting for server confirmation of {section} tasks…</Text> : null}
+        {list.status === 'loading' ? <Text style={styles.copy} accessibilityLiveRegion="polite">Loading {section} tasks…</Text> : null}
+        {list.status === 'cached' ? <Text style={styles.copy} accessibilityLiveRegion="polite">Connection not confirmed. Showing last confirmed {section} tasks, if available.</Text> : null}
+        {list.status === 'pending' ? <Text style={styles.copy} accessibilityLiveRegion="polite">Waiting for server confirmation of {section} tasks…</Text> : null}
         {list.status === 'error' ? <><ErrorNotice>Unable to load current tasks. Check your connection and retry.</ErrorNotice><TaskAction title={`Retry ${section} tasks`} onPress={list.retry} /></> : null}
         {list.status === 'confirmed' && tasks.length === 0 ? <Text style={styles.copy}>{section === 'active' ? 'A little space to begin. Add your first task above.' : 'Your finished tasks will appear here.'}</Text> : null}
         {tasks.map((task: Task) => <View key={task.id} style={styles.row}>
-          <Text style={styles.taskTitle}>{task.title}</Text>
+          <View style={styles.rowControls}>
+          <Pressable style={styles.checkTarget} accessibilityRole="checkbox" accessibilityLabel={task.completedAt ? `Undo completion of ${task.title}` : `Complete ${task.title}`}
+            aria-checked={!!task.completedAt} aria-busy={!!completions[task.id]?.pending} aria-disabled={!!completions[task.id] || dialog?.task.id === task.id}
+            accessibilityState={{ checked: !!task.completedAt, disabled: !!completions[task.id] || dialog?.task.id === task.id, busy: !!completions[task.id]?.pending }}
+            disabled={!!completions[task.id] || dialog?.task.id === task.id} onPress={() => void complete(task, task.completedAt === null)}>
+          <View aria-hidden pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Checkbox.Android theme={{ colors: { primary: colors.saved } }} status={task.completedAt ? 'checked' : 'unchecked'} color={colors.saved} uncheckedColor={colors.secondary}
+            accessible={false} disabled={!!completions[task.id] || dialog?.task.id === task.id} /></View></Pressable>
+          <Pressable ref={(node) => { origins.current[task.id] = node; }} accessibilityRole="button" accessibilityLabel={`Edit ${task.title}`}
+            aria-disabled={!!dialog || !!completions[task.id]} accessibilityState={{ disabled: !!dialog || !!completions[task.id] }} disabled={!!dialog || !!completions[task.id]}
+            onPress={() => openDialog('edit', task)} style={({ pressed }) => [styles.titleTarget, pressed && styles.pressed]}>
+            <Text style={[styles.taskTitle, task.completedAt && styles.completed]}>{task.title}</Text>
+          </Pressable>
+          <View style={styles.actionsTarget}><TaskAction title={`Task actions for ${task.title}`} text="Actions" disabled={!!dialog || !!completions[task.id]} onPress={() => openDialog('actions', task)} /></View></View>
           {completions[task.id] ? <Text style={styles.copy}>{completions[task.id].pending ? 'Saving completion…' : 'Completion change unconfirmed. Use the retry control above.'}</Text> : null}
-          <TaskAction title={task.completedAt ? `Undo completion of ${task.title}` : `Complete ${task.title}`} disabled={!!completions[task.id] || dialog?.task.id === task.id}
-            text={task.completedAt ? 'Undo completion' : 'Complete'} onPress={() => void complete(task, task.completedAt === null)} />
-          <TaskAction title={`Edit ${task.title}`} text="Edit title" disabled={!!dialog || !!completions[task.id]} onPress={() => { setDialogError(''); setDialog({ kind: 'edit', task, title: task.title }); }} />
-          <TaskAction title={`Delete ${task.title}`} text="Delete task" disabled={!!dialog || !!completions[task.id]} onPress={() => { setDialogError(''); setDialog({ kind: 'delete', task, title: task.title }); }} />
         </View>)}
         {list.window?.hasMore ? <TaskAction title={section === 'active' ? 'Load more active tasks' : 'Load older completed tasks'} disabled={list.status !== 'confirmed'} onPress={list.more} /> : null}
       </View>;
@@ -144,15 +179,16 @@ export default function TaskScreen({ repository }: { repository: Repository }) {
   </View>;
 }
 const styles = StyleSheet.create({
-  panel: { gap: 12 },
-  modalPage: { flex: 1, backgroundColor: '#fff' },
-  modalContent: { flexGrow: 1, padding: 24 },
-  heading: { color: '#15251c', fontSize: 22, fontWeight: '700', marginTop: 20 },
-  row: { gap: 8, padding: 16, backgroundColor: '#f0f5ef', borderRadius: 12 },
-  taskTitle: { fontSize: 18, color: '#15251c', fontWeight: '600' },
-  copy: { fontSize: 16, color: '#34483b' },
-  input: { borderWidth: 1, borderColor: '#66756c', borderRadius: 8, minHeight: 48, padding: 12, fontSize: 16, color: '#15251c' },
-  error: { fontSize: 16, color: '#9a2020' },
-  button: { minHeight: 48, borderRadius: 8, backgroundColor: '#214d35', padding: 12, justifyContent: 'center', alignItems: 'center' },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  panel: { gap: 16 },
+  heading: { ...ui.section, marginTop: 24 },
+  row: { gap: 8, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.secondary, minHeight: 56 },
+  rowControls: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: 8 },
+  actionsTarget: { alignSelf: 'flex-start', maxWidth: '100%' },
+  checkTarget: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
+  titleTarget: { flexGrow: 1, flexShrink: 1, flexBasis: 120, minHeight: 48, justifyContent: 'center', paddingHorizontal: 8, borderRadius: 4 },
+  pressed: { backgroundColor: colors.panel },
+  taskTitle: { fontSize: 17, lineHeight: 24, color: colors.ink, flexShrink: 1 },
+  completed: { textDecorationLine: 'line-through' },
+  copy: ui.copy,
+  error: ui.error,
 });

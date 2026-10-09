@@ -1,14 +1,15 @@
 import { createContext, useContext, useState, type ComponentProps, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { ActivityIndicator, TouchableRipple, MD3DarkTheme, PaperProvider, TextInput } from 'react-native-paper';
+import { MaterialDesignIcons } from '@react-native-vector-icons/material-design-icons';
 import { useFonts } from 'expo-font';
 
-export const colors = { canvas: '#151821', panel: '#242936', ink: '#F4F6FC', secondary: '#B5BED0', gold: '#F4CB59', shadow: '#07090F', saved: '#8CD8AA', error: '#FFADB5' };
+export const colors = { canvas: '#111111', panel: '#222222', ink: '#F5F2E9', secondary: '#C3C0B8', gold: '#F2B84B', shadow: '#050505', saved: '#8CD8AA', error: '#FFADB5' };
 export const theme = { ...MD3DarkTheme, roundness: 1, animation: { scale: 0 }, colors: { ...MD3DarkTheme.colors, primary: colors.gold, onPrimary: colors.canvas, background: colors.canvas, surface: colors.panel, onSurface: colors.ink, onSurfaceVariant: colors.secondary, outline: colors.secondary, error: colors.error, surfaceDisabled: colors.panel, onSurfaceDisabled: colors.secondary } };
 const FontReady = createContext(false);
 export function FrontendProvider({ children }: { children: ReactNode }) {
   const [loaded] = useFonts({ PixelifySemiBold: require('../../assets/fonts/PixelifySans-SemiBold.ttf') });
-  return <FontReady.Provider value={loaded}><PaperProvider theme={theme}>{children}</PaperProvider></FontReady.Provider>;
+  return <FontReady.Provider value={loaded}><PaperProvider theme={theme} settings={{ icon: (props) => <MaterialDesignIcons {...props} name={props.name as React.ComponentProps<typeof MaterialDesignIcons>['name']} /> }}>{children}</PaperProvider></FontReady.Provider>;
 }
 export function PageHeading({ children }: { children: string }) {
   const loaded = useContext(FontReady);
@@ -20,7 +21,7 @@ export function Action({ title, text = title, onPress, disabled = false, busy = 
   const [pressed, setPressed] = useState(false);
   const [focused, setFocused] = useState(false);
   return <View style={primary ? ui.actionShadow : undefined}><TouchableRipple theme={theme}
-    accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled, busy }} disabled={disabled} onPress={onPress}
+    accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled, busy }} aria-disabled={disabled} aria-busy={busy} disabled={disabled} onPress={onPress}
     onPressIn={() => setPressed(true)} onPressOut={() => setPressed(false)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
     rippleColor="transparent"
     style={[ui.action, ui.actionContent, { backgroundColor: primary && !disabled ? colors.gold : colors.panel, borderColor: focused ? colors.ink : danger ? colors.error : colors.secondary }, primary && !focused && { borderColor: colors.gold }, disabled && { borderStyle: 'dashed' }, pressed && { transform: [{ translateX: 2 }, { translateY: 2 }], borderColor: colors.ink }, focused && { borderWidth: 3 }]}>
