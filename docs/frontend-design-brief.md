@@ -187,3 +187,6 @@ Relative effort: a token/font/control pass is modest; adapting every recovery/mo
 1. Does the preferred intensity resemble A's quiet rows with bold controls, or B's stronger framed list?
 2. Does Pixelify Sans with readable system body text express enough game identity, or should Silkscreen be compared before choosing?
 3. Should snappiness stay at immediate press/pending feedback, or become a separately specified provisional-row/completion behavior change?
+
+
+Implementation follow-up: the user later explicitly requested pixel typography throughout. Pixelify principal headings plus VT323 body/controls now supersede this discussion draft's system-body recommendation; exact provenance and fallback behavior are recorded in frontend-resources.md.

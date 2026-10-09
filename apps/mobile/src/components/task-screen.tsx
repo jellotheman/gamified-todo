@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, AccessibilityInfo, findNodeHandle } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, AccessibilityInfo, findNodeHandle } from 'react-native';
 import { Checkbox } from 'react-native-paper';
-import { Action, Field, fieldProps, colors, ui, Loading, PageHeading } from './frontend';
+import { BodyText, Action, Field, fieldProps, colors, ui, Loading, PageHeading } from './frontend';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { privateRepository, Task, TaskDraft, TaskSection, TaskWindow, ListStatus } from '../lib/private-repository';
 
@@ -9,7 +9,7 @@ type Repository = ReturnType<typeof privateRepository>;
 const PAGE_SIZE = 25;
 const TaskAction = Action;
 function ErrorNotice({ children }: { children: string }) {
-  return <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.error}>{children}</Text>;
+  return <BodyText accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.error}>{children}</BodyText>;
 }
 function useTaskWindow(repository: Repository, section: TaskSection, sequence: RefObject<number>) {
   const [size, setSize] = useState(PAGE_SIZE);
@@ -44,7 +44,7 @@ export default function TaskScreen({ repository }: { repository: Repository }) {
   const origins = useRef<Record<string, View | null>>({});
   const dialogHeading = useRef<View>(null);
   const composer = useRef<TextInput>(null);
-  function focus(node: { focus?: () => void } | View | Text | null | undefined) {
+  function focus(node: { focus?: () => void } | View | null | undefined) {
     if (!node) return;
     if (Platform.OS === 'web') (node as unknown as { focus?: () => void }).focus?.();
     else { const handle = findNodeHandle(node as View); if (handle) AccessibilityInfo.setAccessibilityFocus(handle); }
@@ -112,10 +112,10 @@ export default function TaskScreen({ repository }: { repository: Repository }) {
     <View style={ui.frame}>
     <Field ref={composer} {...fieldProps} label="Task title" accessibilityLabel="Task title" placeholder="What would you like to do?" value={title}
       onChangeText={setTitle} editable={!pending && !draft} returnKeyType="done" onSubmitEditing={() => void add()} />
-    <Text style={styles.copy}>Use a title with 1–200 characters.</Text>
+    <BodyText style={styles.copy}>Use a title with 1–200 characters.</BodyText>
     {error ? <ErrorNotice>{error}</ErrorNotice> : null}
     {pending ? <Loading text="Saving task… Waiting for server confirmation." /> : null}
-    {draft && !pending ? <Text style={styles.copy}>Retry saves the original submitted title. Your draft is kept until confirmed.</Text> : null}
+    {draft && !pending ? <BodyText style={styles.copy}>Retry saves the original submitted title. Your draft is kept until confirmed.</BodyText> : null}
     <TaskAction title={draft && !pending ? 'Retry adding task' : 'Add task'} primary busy={pending} disabled={pending} onPress={() => void add()} />
     </View>
     {dialog ? <Modal visible animationType="none" onShow={() => { if (dialog.kind !== 'edit') focus(dialogHeading.current); }} onRequestClose={() => closeDialog(false)}>
@@ -124,8 +124,8 @@ export default function TaskScreen({ repository }: { repository: Repository }) {
       <View ref={dialogHeading} tabIndex={-1}><PageHeading>{dialog.kind === 'edit' ? 'Edit task' : dialog.kind === 'actions' ? 'Task actions' : 'Delete this task?'}</PageHeading></View>
       {dialog.kind === 'edit' ? <Field {...fieldProps} autoFocus label="Edit task title" accessibilityLabel="Edit task title" value={dialog.title} editable={!dialogPending}
         onChangeText={(title) => { setDialog({ ...dialog, title }); setDialogError(''); }} returnKeyType="done" onSubmitEditing={() => void saveDialog()} />
-        : <Text style={styles.taskTitle}>{dialog.task.title}</Text>}
-      {dialog.kind === 'delete' ? <Text style={styles.copy}>This permanently removes the task. You can keep it instead.</Text> : null}
+        : <BodyText style={styles.taskTitle}>{dialog.task.title}</BodyText>}
+      {dialog.kind === 'delete' ? <BodyText style={styles.copy}>This permanently removes the task. You can keep it instead.</BodyText> : null}
       {dialogError ? <ErrorNotice>{dialogError}</ErrorNotice> : null}
       {dialogPending ? <Loading text="Saving change… Waiting for server confirmation." /> : null}
       {dialog.kind === 'actions' ? <>
@@ -139,7 +139,7 @@ export default function TaskScreen({ repository }: { repository: Repository }) {
       </>}
     </View></ScrollView></KeyboardAvoidingView></SafeAreaView></Modal> : null}
     {Object.values(completions).map((operation) => <View key={operation.task.id} style={styles.panel}>
-      {operation.pending ? <Text style={styles.copy} accessibilityLiveRegion="polite">Saving completion for {operation.task.title}… Waiting for server confirmation.</Text>
+      {operation.pending ? <BodyText style={styles.copy} accessibilityLiveRegion="polite">Saving completion for {operation.task.title}… Waiting for server confirmation.</BodyText>
         : <><ErrorNotice>{`Unable to confirm completion change for ${operation.task.title}. Check your connection and retry.`}</ErrorNotice>
           <TaskAction title={`Retry completion for ${operation.task.title}`} onPress={() => void complete(operation.task, operation.desired)} /></>}
     </View>)}
@@ -151,12 +151,12 @@ export default function TaskScreen({ repository }: { repository: Repository }) {
       const newer = (list.window?.revision ?? -1) > (other.window?.revision ?? -1);
       const tasks = list.window?.tasks.filter((task) => newer || !other.window?.tasks.some((otherTask) => otherTask.id === task.id)) ?? [];
       return <View key={section} style={styles.panel}>
-        <Text accessibilityRole="header" style={styles.heading}>{section === 'active' ? 'Active' : 'Completed'}</Text>
-        {list.status === 'loading' ? <Text style={styles.copy} accessibilityLiveRegion="polite">Loading {section} tasks…</Text> : null}
-        {list.status === 'cached' ? <Text style={styles.copy} accessibilityLiveRegion="polite">Connection not confirmed. Showing last confirmed {section} tasks, if available.</Text> : null}
-        {list.status === 'pending' ? <Text style={styles.copy} accessibilityLiveRegion="polite">Waiting for server confirmation of {section} tasks…</Text> : null}
+        <BodyText accessibilityRole="header" style={styles.heading}>{section === 'active' ? 'Active' : 'Completed'}</BodyText>
+        {list.status === 'loading' ? <BodyText style={styles.copy} accessibilityLiveRegion="polite">Loading {section} tasks…</BodyText> : null}
+        {list.status === 'cached' ? <BodyText style={styles.copy} accessibilityLiveRegion="polite">Connection not confirmed. Showing last confirmed {section} tasks, if available.</BodyText> : null}
+        {list.status === 'pending' ? <BodyText style={styles.copy} accessibilityLiveRegion="polite">Waiting for server confirmation of {section} tasks…</BodyText> : null}
         {list.status === 'error' ? <><ErrorNotice>Unable to load current tasks. Check your connection and retry.</ErrorNotice><TaskAction title={`Retry ${section} tasks`} onPress={list.retry} /></> : null}
-        {list.status === 'confirmed' && tasks.length === 0 ? <Text style={styles.copy}>{section === 'active' ? 'A little space to begin. Add your first task above.' : 'Your finished tasks will appear here.'}</Text> : null}
+        {list.status === 'confirmed' && tasks.length === 0 ? <BodyText style={styles.copy}>{section === 'active' ? 'A little space to begin. Add your first task above.' : 'Your finished tasks will appear here.'}</BodyText> : null}
         {tasks.map((task: Task) => <View key={task.id} style={styles.row}>
           <View style={styles.rowControls}>
           <Pressable style={({ pressed }) => [styles.checkTarget, pressed && styles.pressed]} accessibilityRole="checkbox" accessibilityLabel={task.completedAt ? `Undo completion of ${task.title}` : `Complete ${task.title}`}
@@ -168,10 +168,10 @@ export default function TaskScreen({ repository }: { repository: Repository }) {
           <Pressable ref={(node) => { origins.current[task.id] = node; }} accessibilityRole="button" accessibilityLabel={`Edit ${task.title}`}
             aria-disabled={!!dialog || !!completions[task.id]} accessibilityState={{ disabled: !!dialog || !!completions[task.id] }} disabled={!!dialog || !!completions[task.id]}
             onPress={() => openDialog('edit', task)} style={({ pressed }) => [styles.titleTarget, pressed && styles.pressed]}>
-            <Text style={[styles.taskTitle, task.completedAt && styles.completed]}>{task.title}</Text>
+            <BodyText style={[styles.taskTitle, task.completedAt && styles.completed]}>{task.title}</BodyText>
           </Pressable>
           <View style={styles.actionsTarget}><TaskAction title={`Task actions for ${task.title}`} text="Actions" disabled={!!dialog || !!completions[task.id]} onPress={() => openDialog('actions', task)} /></View></View>
-          {completions[task.id] ? <Text style={styles.copy}>{completions[task.id].pending ? 'Saving completion…' : 'Completion change unconfirmed. Use the retry control above.'}</Text> : null}
+          {completions[task.id] ? <BodyText style={styles.copy}>{completions[task.id].pending ? 'Saving completion…' : 'Completion change unconfirmed. Use the retry control above.'}</BodyText> : null}
         </View>)}
         {list.window?.hasMore ? <TaskAction title={section === 'active' ? 'Load more active tasks' : 'Load older completed tasks'} disabled={list.status !== 'confirmed'} onPress={list.more} /> : null}
       </View>;
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   checkTarget: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
   titleTarget: { flexGrow: 1, flexShrink: 1, flexBasis: 120, minHeight: 48, justifyContent: 'center', paddingHorizontal: 8, borderRadius: 4 },
   pressed: { backgroundColor: colors.panel },
-  taskTitle: { fontSize: 17, lineHeight: 24, color: colors.ink, flexShrink: 1 },
+  taskTitle: { fontSize: 22, lineHeight: 28, color: colors.ink, flexShrink: 1 },
   completed: { textDecorationLine: 'line-through' },
   copy: ui.copy,
   error: ui.error,

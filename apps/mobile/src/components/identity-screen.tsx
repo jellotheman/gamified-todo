@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  KeyboardAvoidingView, Platform, ScrollView, Text, View,
+  KeyboardAvoidingView, Platform, ScrollView, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authMessage, identity, type Identity } from '../lib/identity';
 import { privateRepository } from '../lib/private-repository';
 import TaskScreen from './task-screen';
-import { Action, Field, fieldProps, Loading, PageHeading, ui as styles } from './frontend';
+import { BodyText, Action, Field, fieldProps, Loading, PageHeading, ui as styles } from './frontend';
 
 
 function Notice({ text }: { text: string }) {
-  return <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.error}>{text}</Text>;
+  return <BodyText accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.error}>{text}</BodyText>;
 }
 
 function AuthForm() {
@@ -56,21 +56,21 @@ function AuthForm() {
   const heading = mode === 'register' ? 'Create your account' : mode === 'reset' ? 'Reset your password' : 'Welcome back';
   return <View style={[styles.panel, styles.frame, { maxWidth: 440 }]}>
     <PageHeading>{heading}</PageHeading>
-    <Text style={styles.label}>Email</Text>
+    <BodyText style={styles.label}>Email</BodyText>
     <Field {...fieldProps} accessibilityLabel="Email" value={email} onChangeText={setEmail} editable={!pending}
       autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email"
       textContentType="emailAddress" returnKeyType={mode === 'reset' ? 'go' : 'next'}
       onSubmitEditing={mode === 'reset' ? () => void submit() : () => passwordInput.current?.focus()} />
     {mode !== 'reset' && <>
-      <Text style={styles.label}>Password</Text>
+      <BodyText style={styles.label}>Password</BodyText>
       <Field {...fieldProps} ref={(input: { focus: () => void } | null) => { passwordInput.current = input; }} accessibilityLabel="Password" value={password} onChangeText={setPassword} editable={!pending}
         secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
         textContentType={mode === 'register' ? 'newPassword' : 'password'} returnKeyType="go"
         onSubmitEditing={() => void submit()} />
-      {mode === 'register' && <Text style={styles.copy}>Use at least 6 characters. A longer, unique password is better.</Text>}
+      {mode === 'register' && <BodyText style={styles.copy}>Use at least 6 characters. A longer, unique password is better.</BodyText>}
     </>}
     {error ? <Notice text={error} /> : null}
-    {message ? <Text accessibilityLiveRegion="polite" style={styles.copy}>{message}</Text> : null}
+    {message ? <BodyText accessibilityLiveRegion="polite" style={styles.copy}>{message}</BodyText> : null}
     {pending && <Loading text="Working…" />}
     <Action title={mode === 'reset' ? 'Send reset email' : mode === 'register' ? 'Register' : 'Sign in'}
       primary busy={pending} disabled={pending} onPress={() => void submit()} />
@@ -103,7 +103,7 @@ function PrivateAccount({ user, onLeave, initialAccountOpen }: { user: Identity;
     <View style={styles.header}><PageHeading>{accountOpen ? 'Account' : 'Tasks'}</PageHeading>
       <Action title={accountOpen ? 'Back to tasks' : 'Account'} onPress={() => setAccountOpen(!accountOpen)} /></View>
     {accountOpen ? <View style={styles.frame}>
-      <Text style={styles.label}>Signed in as</Text><Text style={styles.copy}>{user.email || 'Email address unavailable.'}</Text>
+      <BodyText style={styles.label}>Signed in as</BodyText><BodyText style={styles.copy}>{user.email || 'Email address unavailable.'}</BodyText>
       <Action title="Sign out" danger onPress={onLeave} />
     </View> : null}
     {error ? <><Notice text={error} /><Action title="Retry account loading" onPress={() => { setReady(false); setError(''); setAttempt(attempt + 1); }} /></>
