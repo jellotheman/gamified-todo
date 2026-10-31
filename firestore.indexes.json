@@ -7,6 +7,14 @@
         { "fieldPath": "completedAt", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "areaDays",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "areaId", "order": "ASCENDING" },
+        { "fieldPath": "count", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

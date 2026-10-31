@@ -6,7 +6,17 @@ rules_version = '2';
 // edits/already-completed requests preserve the previous completion timestamp.
 // users/{uid}/profile/settings: exactly dailyGoal (integer, 1–20; default 3).
 // No user root document or parent profile is needed to own a task collection.
-// No public profile, roles, counters or cross-account references exist.
+// users/{uid}/routines/{id}: title, areaId, immutable createdAt.
+// users/{uid}/routineIdentities/{id}: immutable request-time createdAt;
+// created with the routine (or when deleting an older routine) and retained forever.
+// users/{uid}/completions/{once_id|daily_id_date}: questId, kind, date,
+// areaId and request-time createdAt. Stable IDs make retries idempotent.
+// users/{uid}/areaDays/{area_date}: areaId, date, nonnegative count, completionId;
+// the marker identifies the completion changed in the same atomic transaction.
+// users/{uid}/areaTotals/{area}: nonnegative count, date and completionId,
+// changed only when the linked area day crosses zero.
+// users/{uid}/profile/areas: learning, health and home labels.
+// Legacy task documents may lack areaId and legacy completions have no credit.
 service cloud.firestore {
   match /databases/{database}/documents {
     function isAuthenticated() { return request.auth != null; }
@@ -22,15 +32,94 @@ service cloud.firestore {
     }
     function isValidTask(data) {
       return data.keys().hasAll(['title', 'createdAt', 'completedAt'])
-        && data.keys().hasOnly(['title', 'createdAt', 'completedAt'])
+        && data.keys().hasOnly(['title', 'createdAt', 'completedAt', 'areaId'])
         && uidUnchanged(data) && validTitle(data.title)
-        && data.createdAt is timestamp
+        && data.createdAt is timestamp && (!('areaId' in data) || validArea(data.areaId))
         && (data.completedAt == null || data.completedAt is timestamp);
     }
-    function validCompletionTransition() {
+    function validArea(area) { return area == null || area in ['learning', 'health', 'home']; }
+    function validDate(date) {
+      return date is string && !date.matches('^0000-.*') && (
+        date.matches('^[0-9]{4}-(01|03|05|07|08|10|12)-(0[1-9]|[12][0-9]|3[01])$')
+        || date.matches('^[0-9]{4}-(04|06|09|11)-(0[1-9]|[12][0-9]|30)$')
+        || date.matches('^[0-9]{4}-02-(0[1-9]|1[0-9]|2[0-8])$')
+        || date.matches('^([0-9]{2}(0[48]|[2468][048]|[13579][26])|([02468][048]|[13579][26])00)-02-29$'));
+    }
+    function routineIdentityPath(uid, id) { return /databases/$(database)/documents/users/$(uid)/routineIdentities/$(id); }
+    function routinePath(uid, id) { return /databases/$(database)/documents/users/$(uid)/routines/$(id); }
+    function totalPath(uid, area) { return /databases/$(database)/documents/users/$(uid)/areaTotals/$(area); }
+    function totalAdded(uid, data, completionId) {
+      let path = totalPath(uid, data.areaId);
+      return existsAfter(path) && getAfter(path).data.count == (exists(path) ? get(path).data.count : 0) + 1
+        && getAfter(path).data.date == data.date && getAfter(path).data.completionId == completionId;
+    }
+    function totalRemoved(uid, data, completionId) {
+      let path = totalPath(uid, data.areaId);
+      return exists(path) && existsAfter(path) && getAfter(path).data.count == get(path).data.count - 1
+        && getAfter(path).data.date == data.date && getAfter(path).data.completionId == completionId;
+    }
+    function completionPath(uid, id) { return /databases/$(database)/documents/users/$(uid)/completions/$(id); }
+    function dayPath(uid, area, date) {
+      let id = area + '_' + date;
+      return /databases/$(database)/documents/users/$(uid)/areaDays/$(id);
+    }
+    function questPath(uid, kind, id) {
+      let group = kind == 'once' ? 'tasks' : 'routines';
+      return /databases/$(database)/documents/users/$(uid)/$(group)/$(id);
+    }
+    function isValidRoutine(data) {
+      return data.keys().hasAll(['title', 'areaId', 'createdAt']) && data.keys().hasOnly(['title', 'areaId', 'createdAt'])
+        && validTitle(data.title) && validArea(data.areaId) && data.createdAt is timestamp;
+    }
+    function isValidCompletion(data, id) {
+      return data.keys().hasAll(['questId', 'kind', 'date', 'areaId', 'createdAt'])
+        && data.keys().hasOnly(['questId', 'kind', 'date', 'areaId', 'createdAt'])
+        && data.questId is string && data.questId.size() > 0 && data.questId.size() <= 100
+        && data.kind in ['once', 'daily'] && validDate(data.date) && validArea(data.areaId)
+        && data.createdAt is timestamp
+        && id == (data.kind == 'once' ? 'once_' + data.questId : 'daily_' + data.questId + '_' + data.date);
+    }
+    function isValidDay(data, id) {
+      return data.keys().hasAll(['areaId', 'date', 'count', 'completionId'])
+        && data.keys().hasOnly(['areaId', 'date', 'count', 'completionId'])
+        && data.areaId in ['learning', 'health', 'home'] && validDate(data.date)
+        && data.count is int && data.count >= 0 && data.completionId is string
+        && id == data.areaId + '_' + data.date;
+    }
+    function matchingCredit(data, area, date) { return data.areaId == area && data.date == date; }
+    function creditAdded(uid, data) {
+      let path = dayPath(uid, data.areaId == null ? 'none' : data.areaId, data.date);
+      return data.areaId == null || (existsAfter(path)
+        && getAfter(path).data.count == (exists(path) ? get(path).data.count : 0) + 1
+        && getAfter(path).data.completionId == (data.kind == 'once' ? 'once_' + data.questId : 'daily_' + data.questId + '_' + data.date)
+        && ((exists(path) && get(path).data.count > 0) || totalAdded(uid, data, getAfter(path).data.completionId)));
+    }
+    function creditRemoved(uid, data) {
+      let path = dayPath(uid, data.areaId == null ? 'none' : data.areaId, data.date);
+      return data.areaId == null || (exists(path) && existsAfter(path)
+        && getAfter(path).data.count == get(path).data.count - 1
+        && getAfter(path).data.completionId == (data.kind == 'once' ? 'once_' + data.questId : 'daily_' + data.questId + '_' + data.date)
+        && (get(path).data.count > 1 || totalRemoved(uid, data, getAfter(path).data.completionId)));
+    }
+    function validCompletionTransition(uid, id) {
+      let path = completionPath(uid, 'once_' + id);
       return request.resource.data.completedAt == resource.data.completedAt
-        || (resource.data.completedAt == null && request.resource.data.completedAt == request.time)
-        || (resource.data.completedAt is timestamp && request.resource.data.completedAt == null);
+        || (resource.data.completedAt == null && request.resource.data.completedAt == request.time
+          && !exists(path) && existsAfter(path))
+        || (resource.data.completedAt is timestamp && request.resource.data.completedAt == null
+          && !existsAfter(path));
+    }
+    function dayAdded(uid, data) {
+      let path = completionPath(uid, data.completionId);
+      return !exists(path) && existsAfter(path) && matchingCredit(getAfter(path).data, data.areaId, data.date);
+    }
+    function dayRemoved(uid, data) {
+      let path = completionPath(uid, data.completionId);
+      return exists(path) && !existsAfter(path) && matchingCredit(get(path).data, data.areaId, data.date);
+    }
+    function isValidAreas(data) {
+      return data.keys().hasAll(['learning', 'health', 'home']) && data.keys().hasOnly(['learning', 'health', 'home'])
+        && validTitle(data.learning) && validTitle(data.health) && validTitle(data.home);
     }
     function isValidProfile(data) {
       return data.keys().hasAll(['dailyGoal']) && data.keys().hasOnly(['dailyGoal'])
@@ -39,9 +128,83 @@ service cloud.firestore {
     match /users/{uid}/tasks/{taskId} {
       allow read, delete: if isOwner(uid);
       allow create: if isOwner(uid) && isValidTask(request.resource.data)
-        && request.resource.data.createdAt == request.time && request.resource.data.completedAt == null;
+        && request.resource.data.createdAt == request.time && request.resource.data.completedAt == null
+        && !exists(completionPath(uid, 'once_' + taskId)) && !existsAfter(completionPath(uid, 'once_' + taskId));
       allow update: if isOwner(uid) && isValidTask(request.resource.data) && uidNotModified()
-        && request.resource.data.createdAt == resource.data.createdAt && validCompletionTransition();
+        && request.resource.data.createdAt == resource.data.createdAt && validCompletionTransition(uid, taskId);
+    }
+    match /users/{uid}/routines/{routineId} {
+      allow read: if isOwner(uid);
+      allow delete: if isOwner(uid) && existsAfter(routineIdentityPath(uid, routineId));
+      allow create: if isOwner(uid) && isValidRoutine(request.resource.data) && request.resource.data.createdAt == request.time
+        && !exists(routineIdentityPath(uid, routineId)) && existsAfter(routineIdentityPath(uid, routineId));
+      allow update: if isOwner(uid) && isValidRoutine(request.resource.data) && request.resource.data.createdAt == resource.data.createdAt;
+    }
+    match /users/{uid}/routineIdentities/{routineId} {
+      function validIdentity(data) {
+        return data.keys().hasAll(['createdAt']) && data.keys().hasOnly(['createdAt']) && data.createdAt is timestamp;
+      }
+      function accompaniesRoutineTransition() {
+        let path = routinePath(uid, routineId);
+        return (!exists(path) && existsAfter(path)) || (exists(path) && !existsAfter(path));
+      }
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && validIdentity(request.resource.data)
+        && request.resource.data.createdAt == request.time && accompaniesRoutineTransition();
+      allow update, delete: if false;
+    }
+    match /users/{uid}/completions/{completionId} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && isValidCompletion(request.resource.data, completionId)
+        && request.resource.data.createdAt == request.time
+        && exists(questPath(uid, request.resource.data.kind, request.resource.data.questId))
+        && creditAdded(uid, request.resource.data)
+        && (request.resource.data.kind == 'daily' ||
+          getAfter(questPath(uid, 'once', request.resource.data.questId)).data.completedAt == request.time);
+      allow delete: if isOwner(uid) && creditRemoved(uid, resource.data)
+        && (resource.data.kind == 'daily' ||
+          getAfter(questPath(uid, 'once', resource.data.questId)).data.completedAt == null);
+      allow update: if false;
+    }
+    match /users/{uid}/areaDays/{dayId} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && isValidDay(request.resource.data, dayId)
+        && request.resource.data.count == 1 && dayAdded(uid, request.resource.data);
+      allow update: if isOwner(uid) && isValidDay(request.resource.data, dayId)
+        && request.resource.data.areaId == resource.data.areaId && request.resource.data.date == resource.data.date
+        && ((request.resource.data.count == resource.data.count + 1 && dayAdded(uid, request.resource.data))
+          || (request.resource.data.count == resource.data.count - 1 && dayRemoved(uid, request.resource.data)));
+      allow delete: if false;
+    }
+    match /users/{uid}/areaTotals/{areaId} {
+      function validTotal(data) {
+        return areaId in ['learning', 'health', 'home']
+          && data.keys().hasAll(['count', 'date', 'completionId']) && data.keys().hasOnly(['count', 'date', 'completionId'])
+          && data.count is int && data.count >= 0 && validDate(data.date) && data.completionId is string;
+      }
+      function totalDayAdded(data) {
+        let path = dayPath(uid, areaId, data.date);
+        return existsAfter(path) && (!exists(path) || get(path).data.count == 0)
+          && getAfter(path).data.count == 1 && getAfter(path).data.completionId == data.completionId
+          && dayAdded(uid, getAfter(path).data);
+      }
+      function totalDayRemoved(data) {
+        let path = dayPath(uid, areaId, data.date);
+        return exists(path) && existsAfter(path) && get(path).data.count == 1
+          && getAfter(path).data.count == 0 && getAfter(path).data.completionId == data.completionId
+          && dayRemoved(uid, getAfter(path).data);
+      }
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && validTotal(request.resource.data)
+        && request.resource.data.count == 1 && totalDayAdded(request.resource.data);
+      allow update: if isOwner(uid) && validTotal(request.resource.data)
+        && ((request.resource.data.count == resource.data.count + 1 && totalDayAdded(request.resource.data))
+          || (request.resource.data.count == resource.data.count - 1 && totalDayRemoved(request.resource.data)));
+      allow delete: if false;
+    }
+    match /users/{uid}/profile/areas {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isValidAreas(request.resource.data);
     }
     match /users/{uid}/profile/settings {
       allow read, delete: if isOwner(uid);
