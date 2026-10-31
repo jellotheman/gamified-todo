@@ -38,3 +38,7 @@ git push origin dev
 ```
 
 Confirm Checks pass for both pushed branch tips. This promotes the same source through dev and main; runtime Firebase selection comes from the explicit environment values, not the branch or NODE_ENV. A Git push performs no automatic Firebase, hosting or native deployment. Production runtime provisioning/deployment remains a separate explicit operation.
+
+## Formatting and local commits
+
+Install the recommended Prettier VS Code extension for format-on-save; the repository config uses two spaces, single quotes and LF. EditorConfig provides the same whitespace defaults in other supporting editors. `npm ci` installs Husky hooks through the root prepare script. On commit, lint-staged formats only staged files supported by Prettier, then full TypeScript and tests must pass. Root `npm run check` still includes lint and remains the pre-push verification command. Generated directories, environment files, font/license assets and the npm-maintained lockfile are excluded from formatting. No repository-wide formatting migration is required; existing files change formatting only when edited/saved or staged in a later commit.

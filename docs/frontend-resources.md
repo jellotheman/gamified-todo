@@ -8,7 +8,6 @@
 
 Compatibility evidence: TypeScript and controlled identity/task-session screens pass with real Paper controls on SDK 57/RN 0.86.3. `expo install --check` reports current dependencies; Expo Doctor passes 21/21. Coordinator browser inspection covers actual web rendering and saved flows; native keyboard/screen-reader/phone rendering remains separately unverified until actually exercised. No server restart, environment rewrite or native build was performed.
 
-
 ## Task notebook slice (#7)
 
 - Paper Checkbox.Android supplies maintained checkbox visuals. Its built-in touch target is 36 units and replaces accessibility state without busy; one native 48-by-48 Pressable wraps the hidden, non-interactive Paper checkbox to retain checked/disabled/busy semantics and separated title/actions targets.
@@ -17,9 +16,16 @@ Compatibility evidence: TypeScript and controlled identity/task-session screens 
 - Native task dialogs use no transition animation, keyboard avoidance and scrolling. Editor autofocus; action/delete entry focus targets modal heading; ordinary dismissal restores the task title target; acknowledged deletion explicitly restores capture input before list observations remove the original row. Actual browser focus outcomes are coordinator verification; native VoiceOver/TalkBack checks remain pending.
 - Controlled screen regressions preserve saved-loop/retry/window/session behavior and extend task actions, capture Done coalescing and pending editor safeguards. Expo dependency check up to date; Expo Doctor 21/21 passed. Coordinator performs real saved task loop against active server after handoff; no browser results are claimed here.
 
-
 ## User typography override
 
 The user explicitly requested pixel type for essentially all text after reviewing the implemented UI. This supersedes the original system-body choice: existing Pixelify Sans SemiBold remains principal headings; VT323 Regular supplies readable pixel body/form/control text at 22/28 (supporting text 21/26, section headings 26/32). Both keep system fallback until their local font load succeeds. One VT323 face is used at normal weight to avoid synthetic bold and font substitution. No animation, dependency, server or behavior changes.
 
 VT323 source: Google Fonts repository revision `34596296b4e88c29e40df100d488055ac17dbd56`, `ofl/vt323/VT323-Regular.ttf`; https://github.com/google/fonts/tree/34596296b4e88c29e40df100d488055ac17dbd56/ofl/vt323 . SIL OFL 1.1 copyright Peter Hull/VT323 Project Authors retained verbatim at `apps/mobile/assets/fonts/VT323-OFL.txt`. Paper text theme, input label/content, actions, task titles, Account identity and recovery text use this local face; no runtime font fetching.
+
+## Body-font refinement
+
+The user rejected VT323 as too thin. Pixelify Sans Medium (true weight 500) now replaces it for all body/form/control text; principal headings keep the existing weight-600 face. The local Medium asset is instantiated from the same pinned Google Fonts source revision `518dd7e35e026a565d6f655413c4ebe120d11e87` listed above, using fontTools at wght=500. Existing `assets/fonts/OFL.txt` covers both Pixelify assets. Font family alias PixelifyMedium is loaded locally with normal React Native weight to avoid synthetic emboldening. The unused VT323 font/license files were removed. Sizes, behavior, fallback and dependencies are unchanged. Earlier VT323 evidence is historical.
+
+## Quest Board typography
+
+The Quest Board uses Pixelify Sans SemiBold for headings and Inter for body text, forms and controls. Inter is bundled locally as `apps/mobile/assets/fonts/Inter-Variable.ttf` from the Google Fonts repository (https://github.com/google/fonts/tree/main/ofl/inter), with its SIL Open Font License in `apps/mobile/assets/fonts/Inter-OFL.txt`. SHA256: `29160A80FF49DDCAB2C97711247E08B1FAB27A484A329CE8B813D820DC559031`. Both fonts use the system font while loading or if loading fails; no runtime font network access is required.

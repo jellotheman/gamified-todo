@@ -17,11 +17,29 @@ Install **SDK 57 Expo Go** on your phone:
 
 Connect your phone and computer to the same Wi-Fi and scan Metro's QR code. Keep Metro running for Fast Refresh. If the phone cannot connect, check that the network allows devices to communicate and allow Node/Metro through the Windows firewall on your private network. Stop Metro with Ctrl+C when finished. `npm run android` opens Expo Go on an existing local Android emulator; no emulator is needed for phone testing.
 
-The app first restores any saved session, then displays registration/sign-in or the authenticated private task list. New accounts receive a private profile with daily goal 3 (editable goal UI comes later). Password-reset responses deliberately do not disclose whether an account exists. Inputs survive failed operations; retry using the same submit control. Sign-out immediately hides private content, including when sign-out needs retry.
+The app first restores any saved session, then displays registration/sign-in or the private Quest Board. Password-reset responses deliberately do not disclose whether an account exists. Sign-out immediately hides private content, including when sign-out needs retry. The retained private profile has a historical daily-goal field; Quest Board progress uses recorded area days instead.
+
+**Current implementation status:** Quest Board source is committed locally on `dev` with subsequent repairs still uncommitted. The revised Firestore rules/indexes are deployed to the verified free-tier development project, and the area-day index is READY. Live SDK verification passed 23 groups and an agent-owned browser exercised the saved quest loop; physical SDK 57 phone verification remains pending. See [Firebase development](firebase-development.md#quest-board-schema-and-verification-status).
 
 Optional initialization/storage smoke logging: uncomment `EXPO_PUBLIC_RUN_DEVELOPMENT_SMOKE=true` in `.env.local`, restart Metro, then open the app and inspect its logs. Success confirms Firebase Auth/Firestore share the configured app and a temporary AsyncStorage value was written, read and removed. The smoke check itself makes no sign-in or Firestore request; the authenticated screen normally initializes/subscribes to its private profile. Disable the flag afterward.
 
-## iPhone identity verification
+## Quest Board demo walkthrough and verification
+
+[Editor review screenshot](design-references/quest-editor-review.png): a sanitized 375 × 667 browser capture of the final multiline editor after visual pass 5. It illustrates the editor and does not establish saved backend behavior or native device operation. A separate screenshot showing unavailable-backend errors was a diagnostic capture, not a polished final screen. A browser saved-loop check was performed after development rules deployment; this editor capture alone is not evidence of the saved loop.
+
+[Quest Board](design-references/quest-board-review.png) and [Progress](design-references/quest-progress-review.png) show that browser review using an isolated development account and synthetic quest/area data. The reviewed flow included successful completion, Undo and recompletion. The isolated account and its test data were cleaned up. These screenshots document browser evidence; they do not establish physical-device behavior.
+
+Use the development `.env.local`, Node and SDK 57 Expo Go setup above. Reuse an already running Metro server; otherwise run root `npm start` and scan its QR code. Use an ordinary private development account and marked disposable quests. This describes the intended demonstration; record actual phone outcomes separately from the development SDK and browser checks.
+
+1. Sign in and show **Quests**. Open **Add quest**, enter a title, choose **Daily** and an area, then save. Add an uncategorized **Once** quest. Close and reopen an unfinished editor to demonstrate its session draft.
+2. Complete the daily quest. Show saving/confirmed feedback and **Undo**, then complete it again. Open **Completed** to show today's completed routine and paged one-off history. Repeat the daily check on the next calendar day to verify it becomes available again.
+3. Use **Pick for me** on an eligible displayed one-off, then edit its title and area. Open delete confirmation and explain that recorded progress remains. Demonstrate retry with a controlled connection failure, then restore connectivity and retry the same submission.
+4. Open **Progress** to show the confirmed area-day count and milestones. Multiple completions in one area on one date should add one day; undoing only one of multiple contributions should preserve it. Open **Account**, rename a starter area, then show the same history under its new label.
+5. Sign out and verify private content disappears. Remove marked test data and record screenshots only after confirming the data is disposable. Avoid exposing credentials, account identifiers or invented personal progress.
+
+Record actual SDK 57 Android and iPhone results separately: restart/session restoration; the saved daily loop across midnight and foreground resume; offline retry; account isolation; keyboard, safe areas, long titles, large text, screen-reader focus and reduced motion. Unit tests and browser previews do not establish native behavior. The editor capture and an agent-owned browser saved-loop check are recorded; complete the remaining physical-device checks and record any additional visual evidence separately.
+
+## Historical iPhone identity verification
 
 Use SDK 57 Expo Go with the real development project and an ordinary private email/password account. Record these checks separately from mocked tests:
 
@@ -46,7 +64,7 @@ Actual Android/iPhone operation must be checked on a physical device; successful
 
 References: [SDK 57](https://docs.expo.dev/versions/v57.0.0/) · [Firebase setup](firebase-development.md)
 
-## iPhone task-loop verification (#3)
+## Historical iPhone task-loop verification (#3)
 
 Use SDK 57 Expo Go and the real development project. The user reported that the task loop works on Web and iPhone in the live SDK 57 Expo Go session. The full restart, second-account isolation, offline recovery and VoiceOver/large-text checklist remains pending until those outcomes are explicitly recorded.
 

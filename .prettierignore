@@ -1,0 +1,12 @@
+node_modules/
+**/node_modules/
+**/.expo/
+**/dist/
+**/coverage/
+**/ios/
+**/android/
+.husky/_/
+package-lock.json
+.env*
+**/.env*
+apps/mobile/assets/fonts/

@@ -1,6 +1,12 @@
 import { beforeEach, expect, jest, test } from '@jest/globals';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signOut,
+} from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { doc, onSnapshot, runTransaction } from 'firebase/firestore';
@@ -9,11 +15,17 @@ import Index from '../app/index';
 jest.mock('../components/task-screen', () => () => null);
 jest.mock('../lib/firebase', () => ({ auth: { currentUser: null }, firestore: {} }));
 jest.mock('firebase/auth', () => ({
-  onAuthStateChanged: jest.fn(), createUserWithEmailAndPassword: jest.fn(),
-  signInWithEmailAndPassword: jest.fn(), sendPasswordResetEmail: jest.fn(), signOut: jest.fn(),
+  onAuthStateChanged: jest.fn(),
+  createUserWithEmailAndPassword: jest.fn(),
+  signInWithEmailAndPassword: jest.fn(),
+  sendPasswordResetEmail: jest.fn(),
+  signOut: jest.fn(),
 }));
 jest.mock('firebase/firestore', () => ({
-  doc: jest.fn(), collection: jest.fn(), runTransaction: jest.fn(), onSnapshot: jest.fn(() => jest.fn()),
+  doc: jest.fn(),
+  collection: jest.fn(),
+  runTransaction: jest.fn(),
+  onSnapshot: jest.fn(() => jest.fn()),
   serverTimestamp: jest.fn(),
 }));
 
@@ -26,7 +38,9 @@ function identityChanged(user: User | null) {
   Object.assign(auth, { currentUser: user });
   for (const observer of [...observers]) observer(user);
 }
-function user(uid: string, email: string): User { return { uid, email } as User; }
+function user(uid: string, email: string): User {
+  return { uid, email } as User;
+}
 beforeEach(() => {
   jest.clearAllMocks();
   observers.clear();
@@ -35,12 +49,17 @@ beforeEach(() => {
     if (typeof next !== 'function') throw new Error('Expected callback');
     observers.add(next);
     if (error) restorationFailed = error;
-    return jest.fn(() => { observers.delete(next); });
+    return jest.fn(() => {
+      observers.delete(next);
+    });
   });
   jest.mocked(doc).mockReturnValue({ type: 'document' } as ReturnType<typeof doc>);
-  jest.mocked(runTransaction).mockImplementation(async (_db, callback) => callback({
-    get: async () => mockProfile, set: jest.fn(),
-  } as unknown as Parameters<typeof callback>[0]));
+  jest.mocked(runTransaction).mockImplementation(async (_db, callback) =>
+    callback({
+      get: async () => mockProfile,
+      set: jest.fn(),
+    } as unknown as Parameters<typeof callback>[0])
+  );
   jest.mocked(onSnapshot).mockImplementation((_reference, _options, next?) => {
     profileChanged = next as (snapshot: unknown) => void;
     return mockStopSnapshot;
@@ -69,8 +88,12 @@ test('successful registration passes trimmed email and enters the observed authe
     return { user: created, providerId: 'password', operationType: 'signIn' };
   });
   await fireEvent.press(screen.getByRole('button', { name: 'Register' }));
-  expect(createUserWithEmailAndPassword).toHaveBeenCalledWith(auth, 'new@example.com', 'private-password');
-  expect(screen.getByText('Tasks')).toBeTruthy();
+  expect(createUserWithEmailAndPassword).toHaveBeenCalledWith(
+    auth,
+    'new@example.com',
+    'private-password'
+  );
+  expect(screen.getByText('Quest Board')).toBeTruthy();
   expect(screen.queryByLabelText('Password')).toBeNull();
 });
 
@@ -80,11 +103,17 @@ test('private account failures offer retry and unconfirmed local snapshots never
   await act(() => identityChanged(user('owner-a', 'first@example.com')));
   expect(screen.getByRole('button', { name: 'Retry account loading' })).toBeTruthy();
   await fireEvent.press(screen.getByRole('button', { name: 'Retry account loading' }));
-  await act(() => profileChanged({ ...mockProfile, metadata: { fromCache: true, hasPendingWrites: false } }));
+  await act(() =>
+    profileChanged({ ...mockProfile, metadata: { fromCache: true, hasPendingWrites: false } })
+  );
   expect(screen.getByText('Loading your private account…')).toBeTruthy();
-  await act(() => profileChanged({ ...mockProfile, metadata: { fromCache: false, hasPendingWrites: true } }));
+  await act(() =>
+    profileChanged({ ...mockProfile, metadata: { fromCache: false, hasPendingWrites: true } })
+  );
   expect(screen.getByText('Loading your private account…')).toBeTruthy();
-  await act(() => profileChanged({ ...mockProfile, metadata: { fromCache: false, hasPendingWrites: false } }));
+  await act(() =>
+    profileChanged({ ...mockProfile, metadata: { fromCache: false, hasPendingWrites: false } })
+  );
   expect(screen.queryByText('Loading your private account…')).toBeNull();
 });
 
@@ -97,13 +126,20 @@ test('invalid input avoids a network request and a pending sign in blocks duplic
   await fireEvent.changeText(screen.getByLabelText('Email'), 'person@example.com');
   await fireEvent.changeText(screen.getByLabelText('Password'), 'private-password');
   let rejectRequest: (error: unknown) => void = () => {};
-  jest.mocked(signInWithEmailAndPassword).mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectRequest = reject; }));
+  jest.mocked(signInWithEmailAndPassword).mockImplementationOnce(
+    () =>
+      new Promise((_resolve, reject) => {
+        rejectRequest = reject;
+      })
+  );
   await fireEvent.press(screen.getByRole('button', { name: 'Sign in' }));
   await fireEvent.press(screen.getByRole('button', { name: 'Sign in' }));
   expect(signInWithEmailAndPassword).toHaveBeenCalledTimes(1);
   expect(screen.getByText('Working…')).toBeTruthy();
   await act(() => rejectRequest({ code: 'auth/network-request-failed' }));
-  expect(screen.getByRole('button', { name: 'Sign in' }).props.accessibilityState.disabled).toBe(false);
+  expect(screen.getByRole('button', { name: 'Sign in' }).props.accessibilityState.disabled).toBe(
+    false
+  );
 });
 
 test('password reset success and unknown email share a generic response; network failure keeps recovery available', async () => {
@@ -118,7 +154,9 @@ test('password reset success and unknown email share a generic response; network
   jest.mocked(sendPasswordResetEmail).mockRejectedValueOnce({ code: 'auth/user-not-found' });
   await fireEvent.press(screen.getByRole('button', { name: 'Send reset email' }));
   expect(screen.getByText(response)).toBeTruthy();
-  jest.mocked(sendPasswordResetEmail).mockRejectedValueOnce({ code: 'auth/network-request-failed' });
+  jest
+    .mocked(sendPasswordResetEmail)
+    .mockRejectedValueOnce({ code: 'auth/network-request-failed' });
   await fireEvent.press(screen.getByRole('button', { name: 'Send reset email' }));
   expect(screen.getByRole('alert')).toBeTruthy();
   expect(screen.getByLabelText('Email').props.value).toBe('person@example.com');
@@ -128,17 +166,21 @@ test('password reset success and unknown email share a generic response; network
 test('account switching detaches private subscriptions and ignores stale private callbacks', async () => {
   await render(<Index />);
   await act(() => identityChanged(user('owner-a', 'first@example.com')));
-  expect(screen.getByText('Tasks')).toBeTruthy();
+  expect(screen.getByText('Quest Board')).toBeTruthy();
   expect(screen.getByText('Loading your private account…')).toBeTruthy();
   const staleCallback = profileChanged;
-  await act(() => profileChanged({ ...mockProfile, metadata: { fromCache: false, hasPendingWrites: false } }));
+  await act(() =>
+    profileChanged({ ...mockProfile, metadata: { fromCache: false, hasPendingWrites: false } })
+  );
   expect(screen.queryByText('Loading your private account…')).toBeNull();
   await act(() => identityChanged(user('owner-b', 'second@example.com')));
   expect(mockStopSnapshot).toHaveBeenCalled();
   expect(screen.queryByText('first@example.com')).toBeNull();
   await fireEvent.press(screen.getByRole('button', { name: 'Account' }));
   expect(screen.getByText('second@example.com')).toBeTruthy();
-  await act(() => staleCallback({ exists: () => false, metadata: { fromCache: false, hasPendingWrites: false } }));
+  await act(() =>
+    staleCallback({ exists: () => false, metadata: { fromCache: false, hasPendingWrites: false } })
+  );
   expect(screen.queryByRole('alert')).toBeNull();
   expect(screen.getByText('Loading your private account…')).toBeTruthy();
 });
@@ -147,7 +189,12 @@ test('sign out clears private state before acknowledgement and failure has acces
   await render(<Index />);
   await act(() => identityChanged(user('owner-a', 'first@example.com')));
   let rejectSignOut: (error: unknown) => void = () => {};
-  jest.mocked(signOut).mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectSignOut = reject; }));
+  jest.mocked(signOut).mockImplementationOnce(
+    () =>
+      new Promise((_resolve, reject) => {
+        rejectSignOut = reject;
+      })
+  );
   await fireEvent.press(screen.getByRole('button', { name: 'Account' }));
   await fireEvent.press(screen.getByRole('button', { name: 'Sign out' }));
   expect(screen.queryByText('Tasks')).toBeNull();
@@ -155,7 +202,9 @@ test('sign out clears private state before acknowledgement and failure has acces
   expect(mockStopSnapshot).toHaveBeenCalled();
   await act(() => rejectSignOut({ code: 'auth/network-request-failed' }));
   expect(screen.getByRole('button', { name: 'Retry sign out' })).toBeTruthy();
-  jest.mocked(signOut).mockImplementationOnce(async () => { identityChanged(null); });
+  jest.mocked(signOut).mockImplementationOnce(async () => {
+    identityChanged(null);
+  });
   await fireEvent.press(screen.getByRole('button', { name: 'Retry sign out' }));
   expect(screen.getByRole('button', { name: 'Sign in' })).toBeTruthy();
 });
@@ -167,12 +216,16 @@ test('restoration is distinguishable from signed out and sign-in failure preserv
   await act(() => identityChanged(null));
   await fireEvent.changeText(screen.getByLabelText('Email'), 'person@example.com');
   await fireEvent.changeText(screen.getByLabelText('Password'), 'private-password');
-  jest.mocked(signInWithEmailAndPassword).mockRejectedValueOnce({ code: 'auth/network-request-failed' });
+  jest
+    .mocked(signInWithEmailAndPassword)
+    .mockRejectedValueOnce({ code: 'auth/network-request-failed' });
   await fireEvent.press(screen.getByRole('button', { name: 'Sign in' }));
   expect(screen.getByRole('alert').props.children).toContain('connection');
   expect(screen.getByLabelText('Email').props.value).toBe('person@example.com');
   expect(screen.getByLabelText('Password').props.value).toBe('private-password');
-  jest.mocked(signInWithEmailAndPassword).mockRejectedValueOnce({ code: 'auth/invalid-credential' });
+  jest
+    .mocked(signInWithEmailAndPassword)
+    .mockRejectedValueOnce({ code: 'auth/invalid-credential' });
   await fireEvent.press(screen.getByRole('button', { name: 'Sign in' }));
   expect(screen.getByRole('alert').props.children).toContain('email and password');
 });
@@ -183,13 +236,16 @@ test('registration failure offers retry without losing input', async () => {
   await fireEvent.press(screen.getByRole('button', { name: 'Create an account' }));
   await fireEvent.changeText(screen.getByLabelText('Email'), 'new@example.com');
   await fireEvent.changeText(screen.getByLabelText('Password'), 'private-password');
-  jest.mocked(createUserWithEmailAndPassword).mockRejectedValueOnce({ code: 'auth/email-already-in-use' });
+  jest
+    .mocked(createUserWithEmailAndPassword)
+    .mockRejectedValueOnce({ code: 'auth/email-already-in-use' });
   await fireEvent.press(screen.getByRole('button', { name: 'Register' }));
   expect(screen.getByRole('alert')).toBeTruthy();
   expect(screen.getByLabelText('Email').props.value).toBe('new@example.com');
-  expect(screen.getByRole('button', { name: 'Register' }).props.accessibilityState.disabled).toBe(false);
+  expect(screen.getByRole('button', { name: 'Register' }).props.accessibilityState.disabled).toBe(
+    false
+  );
 });
-
 
 test('Account displays a missing-email fallback and failed sign-out can return to Account', async () => {
   await render(<Index />);
@@ -201,5 +257,20 @@ test('Account displays a missing-email fallback and failed sign-out can return t
   expect(screen.queryByText('Email address unavailable.')).toBeNull();
   await fireEvent.press(screen.getByRole('button', { name: 'Return to account' }));
   expect(screen.getByText('Email address unavailable.')).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'Back to tasks' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Back to quests' })).toBeTruthy();
+});
+
+test('registration associates an invalid email with its adjacent error', async () => {
+  await render(<Index />);
+  await act(() => identityChanged(null));
+  await fireEvent.press(screen.getByRole('button', { name: 'Create an account' }));
+  expect(screen.queryByRole('button', { name: 'Forgot password?' })).toBeNull();
+  await fireEvent.changeText(screen.getByLabelText('Email'), 'invalid');
+  await fireEvent.press(screen.getByRole('button', { name: 'Register' }));
+  expect(screen.getByLabelText('Email').props['aria-invalid']).toBe(true);
+  expect(screen.getByLabelText('Email').props['aria-describedby']).toBe('email-error');
+  expect(screen.getByRole('alert').props.nativeID).toBe('email-error');
+  await fireEvent.changeText(screen.getByLabelText('Email'), 'person@example.com');
+  expect(screen.getByLabelText('Email').props['aria-invalid']).toBe(false);
+  expect(screen.queryByRole('alert')).toBeNull();
 });
