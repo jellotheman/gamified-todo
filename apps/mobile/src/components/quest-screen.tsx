@@ -1096,8 +1096,13 @@ export default function QuestScreen({
           animationType="none"
           accessibilityLabel={dialog.kind === 'actions' ? 'Quest actions' : 'Delete this quest?'}
           onShow={() => {
-            const handle = findNodeHandle(dialogHeading.current);
-            if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+            const node = dialogHeading.current;
+            if (!node) return;
+            if (Platform.OS === 'web') (node as unknown as { focus?: () => void }).focus?.();
+            else {
+              const handle = findNodeHandle(node);
+              if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+            }
           }}
           onRequestClose={() => {
             setDialog(null);

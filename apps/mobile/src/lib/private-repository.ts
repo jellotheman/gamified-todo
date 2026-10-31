@@ -4,6 +4,7 @@ import {
   doc,
   documentId as firestoreDocumentId,
   getCountFromServer,
+  getDocFromServer,
   limit,
   onSnapshot,
   orderBy,
@@ -158,10 +159,35 @@ function taskValue(snapshot: DocumentSnapshot): Task {
  */
 export function privateRepository(uid: string) {
   documentId(uid);
-  function requireOwner() {
-    if (auth.currentUser?.uid !== uid)
-      throw new Error('Your session changed. Please sign in again.');
+  const owner = auth.currentUser;
+  if (!owner || owner.uid !== uid) throw new Error('Your session changed. Please sign in again.');
+  let valid = true;
+  let firstAuthEvent = true;
+  const subscriptions = new Set<() => void>();
+  function isOwner() {
+    if (valid && auth.currentUser !== owner) invalidate();
+    return valid;
   }
+  function requireOwner() {
+    if (!isOwner()) throw new Error('Your session changed. Please sign in again.');
+  }
+  let stopAuth = () => {};
+  function invalidate() {
+    if (!valid) return;
+    valid = false;
+    for (const stop of subscriptions) stop();
+    subscriptions.clear();
+    stopAuth();
+  }
+  stopAuth = onAuthStateChanged(auth, (user) => {
+    if (firstAuthEvent && user === owner && auth.currentUser === owner) {
+      firstAuthEvent = false;
+      return;
+    }
+    firstAuthEvent = false;
+    invalidate();
+  });
+  if (!valid) stopAuth();
   requireOwner();
   const tasks = collection(firestore, 'users', uid, 'tasks');
   const profile = doc(firestore, 'users', uid, 'profile', 'settings');
@@ -187,17 +213,15 @@ export function privateRepository(uid: string) {
     requireOwner();
     let active = true;
     let stopSnapshot = () => {};
-    let stopAuth = () => {};
     const stop = () => {
+      if (!active) return;
       active = false;
+      subscriptions.delete(stop);
       stopSnapshot();
-      stopAuth();
     };
-    stopAuth = onAuthStateChanged(auth, (user) => {
-      if (user?.uid !== uid) stop();
-    });
+    subscriptions.add(stop);
     const receive = (snapshot: QuerySnapshot | DocumentSnapshot) => {
-      if (!active || auth.currentUser?.uid !== uid) return;
+      if (!active || !isOwner()) return;
       status?.(
         snapshot.metadata.hasPendingWrites
           ? 'pending'
@@ -213,20 +237,18 @@ export function privateRepository(uid: string) {
       }
     };
     const fail = (reason: unknown) => {
-      if (active && auth.currentUser?.uid === uid) error(reason);
+      if (active && isOwner()) error(reason);
     };
     stopSnapshot =
       source.type === 'document'
         ? onSnapshot(source, { includeMetadataChanges: true }, receive, fail)
         : onSnapshot(source, { includeMetadataChanges: true }, receive, fail);
-    if (!active) {
-      stopSnapshot();
-      stopAuth();
-    }
+    if (!active) stopSnapshot();
     return stop;
   }
 
   return {
+    dispose: invalidate,
     prepareQuest(title: string, kind: 'once' | 'daily', areaId: AreaId | null): QuestDraft {
       requireOwner();
       if (kind !== 'once' && kind !== 'daily') throw new Error('Invalid quest kind.');
@@ -322,93 +344,145 @@ export function privateRepository(uid: string) {
       const recordId = completionId(submission);
       const reference = completion(recordId);
       const quest = submission.kind === 'once' ? task(submission.id) : routine(submission.id);
-      const creditedTotal = await runTransaction(firestore, async (transaction) => {
-        requireOwner();
-        const [savedQuest, savedCompletion] = await Promise.all([
-          transaction.get(quest),
-          transaction.get(reference),
-        ]);
-        requireOwner();
-        if (!savedQuest.exists()) throw new Error('This quest no longer exists.');
-        // Existing records, not a later edit or retry payload, determine Undo credit.
-        const existing = savedCompletion.exists() ? savedCompletion.data() : null;
-        const creditArea = existing ? areaValue(existing.areaId) : submission.areaId;
-        const creditDate = existing ? validDate(String(existing.date)) : submission.date;
-        const counter = creditArea ? day(creditArea, creditDate) : null;
-        const counterSnapshot =
-          counter && completed !== !!existing ? await transaction.get(counter) : null;
-        const currentCount = counterSnapshot?.exists() ? counterSnapshot.data().count : 0;
-        const changesDay =
-          !!counter && !!counterSnapshot && (completed ? currentCount === 0 : currentCount === 1);
-        const totalRef = creditArea && changesDay ? total(creditArea) : null;
-        const totalSnapshot = totalRef ? await transaction.get(totalRef) : null;
-        requireOwner();
-        const previousTotal = totalSnapshot?.exists() ? totalSnapshot.data().count : 0;
-        if (
-          totalSnapshot &&
-          (!Number.isSafeInteger(previousTotal) ||
-            previousTotal < 0 ||
-            (!completed && previousTotal < 1))
-        )
-          throw new Error('Invalid saved area total.');
-        if (completed && !existing) {
-          // A legacy completed task has no credit; never backfill it on retry.
-          if (submission.kind === 'once' && savedQuest.data().completedAt !== null) return null;
-          transaction.set(reference, {
-            questId: submission.id,
-            kind: submission.kind,
-            date: submission.date,
-            areaId: submission.areaId,
-            createdAt: serverTimestamp(),
-          });
+      // A concurrent commit can make Rules reject the stale transaction before
+      // Firestore reports an aborted conflict. Retry only when a server read
+      // proves one of the documents involved actually changed.
+      let observed: { reference: DocumentReference; exists: boolean; count?: number }[] = [];
+      const attemptCompletion = () =>
+        runTransaction(firestore, async (transaction) => {
+          requireOwner();
+          const [savedQuest, savedCompletion] = await Promise.all([
+            transaction.get(quest),
+            transaction.get(reference),
+          ]);
+          requireOwner();
+          if (!savedQuest.exists()) throw new Error('This quest no longer exists.');
+          observed = [{ reference, exists: savedCompletion.exists() }];
+          // Existing records, not a later edit or retry payload, determine Undo credit.
+          const existing = savedCompletion.exists() ? savedCompletion.data() : null;
+          const creditArea = existing ? areaValue(existing.areaId) : submission.areaId;
+          const creditDate = existing ? validDate(String(existing.date)) : submission.date;
+          const counter = creditArea ? day(creditArea, creditDate) : null;
+          const counterSnapshot =
+            counter && completed !== !!existing ? await transaction.get(counter) : null;
+          const currentCount = counterSnapshot?.exists() ? counterSnapshot.data().count : 0;
           if (counter && counterSnapshot)
-            transaction.set(counter, {
-              areaId: creditArea,
-              date: creditDate,
-              count: (counterSnapshot.exists() ? counterSnapshot.data().count : 0) + 1,
-              completionId: recordId,
+            observed.push({
+              reference: counter,
+              exists: counterSnapshot.exists(),
+              count: currentCount,
             });
-          if (totalRef)
-            transaction.set(totalRef, {
-              count: previousTotal + 1,
-              date: creditDate,
-              completionId: recordId,
+          const changesDay =
+            !!counter && !!counterSnapshot && (completed ? currentCount === 0 : currentCount === 1);
+          const totalRef = creditArea && changesDay ? total(creditArea) : null;
+          const totalSnapshot = totalRef ? await transaction.get(totalRef) : null;
+          requireOwner();
+          const previousTotal = totalSnapshot?.exists() ? totalSnapshot.data().count : 0;
+          if (totalRef && totalSnapshot)
+            observed.push({
+              reference: totalRef,
+              exists: totalSnapshot.exists(),
+              count: previousTotal,
             });
-          if (submission.kind === 'once')
-            transaction.update(quest, { completedAt: serverTimestamp() });
-          return totalRef ? previousTotal + 1 : null;
-        } else if (!completed && existing) {
-          transaction.delete(reference);
-          if (counter && counterSnapshot) {
-            if (
-              !counterSnapshot.exists() ||
-              !Number.isSafeInteger(counterSnapshot.data().count) ||
-              counterSnapshot.data().count < 1
-            )
-              throw new Error('Invalid saved area progress.');
-            transaction.set(counter, {
-              areaId: creditArea,
-              date: creditDate,
-              count: counterSnapshot.data().count - 1,
-              completionId: recordId,
+          if (
+            totalSnapshot &&
+            (!Number.isSafeInteger(previousTotal) ||
+              previousTotal < 0 ||
+              (!completed && previousTotal < 1))
+          )
+            throw new Error('Invalid saved area total.');
+          if (completed && !existing) {
+            // A legacy completed task has no credit; never backfill it on retry.
+            if (submission.kind === 'once' && savedQuest.data().completedAt !== null) return null;
+            transaction.set(reference, {
+              questId: submission.id,
+              kind: submission.kind,
+              date: submission.date,
+              areaId: submission.areaId,
+              createdAt: serverTimestamp(),
             });
+            if (counter && counterSnapshot)
+              transaction.set(counter, {
+                areaId: creditArea,
+                date: creditDate,
+                count: (counterSnapshot.exists() ? counterSnapshot.data().count : 0) + 1,
+                completionId: recordId,
+              });
+            if (totalRef)
+              transaction.set(totalRef, {
+                count: previousTotal + 1,
+                date: creditDate,
+                completionId: recordId,
+              });
+            if (submission.kind === 'once')
+              transaction.update(quest, { completedAt: serverTimestamp() });
+            return totalRef ? previousTotal + 1 : null;
+          } else if (!completed && existing) {
+            transaction.delete(reference);
+            if (counter && counterSnapshot) {
+              if (
+                !counterSnapshot.exists() ||
+                !Number.isSafeInteger(counterSnapshot.data().count) ||
+                counterSnapshot.data().count < 1
+              )
+                throw new Error('Invalid saved area progress.');
+              transaction.set(counter, {
+                areaId: creditArea,
+                date: creditDate,
+                count: counterSnapshot.data().count - 1,
+                completionId: recordId,
+              });
+            }
+            if (totalRef)
+              transaction.set(totalRef, {
+                count: previousTotal - 1,
+                date: creditDate,
+                completionId: recordId,
+              });
+            if (submission.kind === 'once') transaction.update(quest, { completedAt: null });
+          } else if (
+            !completed &&
+            submission.kind === 'once' &&
+            savedQuest.data().completedAt !== null
+          ) {
+            transaction.update(quest, { completedAt: null });
           }
-          if (totalRef)
-            transaction.set(totalRef, {
-              count: previousTotal - 1,
-              date: creditDate,
-              completionId: recordId,
-            });
-          if (submission.kind === 'once') transaction.update(quest, { completedAt: null });
-        } else if (
-          !completed &&
-          submission.kind === 'once' &&
-          savedQuest.data().completedAt !== null
-        ) {
-          transaction.update(quest, { completedAt: null });
+          return null;
+        });
+      let creditedTotal: number | null = null;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          creditedTotal = await attemptCompletion();
+          break;
+        } catch (reason) {
+          requireOwner();
+          if (
+            attempt >= 2 ||
+            !reason ||
+            typeof reason !== 'object' ||
+            !('code' in reason) ||
+            reason.code !== 'permission-denied'
+          )
+            throw reason;
+          let changed = false;
+          try {
+            const snapshots = await Promise.all(
+              observed.map((entry) => getDocFromServer(entry.reference))
+            );
+            requireOwner();
+            changed = snapshots.some(
+              (snapshot, index) =>
+                snapshot.exists() !== observed[index].exists ||
+                (observed[index].count !== undefined &&
+                  snapshot.exists() &&
+                  snapshot.data().count !== observed[index].count)
+            );
+          } catch {
+            requireOwner();
+          }
+          if (!changed) throw reason;
         }
-        return null;
-      });
+      }
       requireOwner();
       return creditedTotal;
     },

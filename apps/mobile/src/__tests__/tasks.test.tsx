@@ -168,7 +168,7 @@ test('completion coalesces taps, retries desired state, then supports saved undo
     screen.getByText('Saving completion for Read… Waiting for server confirmation.')
   ).toBeTruthy();
   await act(() => rejectSave(new Error('offline')));
-  jest.mocked(repository.setQuestCompletion).mockResolvedValueOnce(undefined);
+  jest.mocked(repository.setQuestCompletion).mockResolvedValueOnce(null);
   await fireEvent.press(screen.getByRole('button', { name: 'Retry completion for Read' }));
   expect(repository.setQuestCompletion).toHaveBeenLastCalledWith(
     expect.objectContaining({ id: 'one' }),
@@ -178,7 +178,7 @@ test('completion coalesces taps, retries desired state, then supports saved undo
     listeners.completed({ tasks: [{ ...task, completedAt: new Timestamp(20, 0) }], hasMore: false })
   );
   expect(screen.queryByRole('checkbox', { name: 'Complete Read' })).toBeNull(); // no duplicate when section listeners arrive out of order
-  jest.mocked(repository.setQuestCompletion).mockResolvedValueOnce(undefined);
+  jest.mocked(repository.setQuestCompletion).mockResolvedValueOnce(null);
   await fireEvent.press(screen.getByRole('checkbox', { name: 'Undo completion of Read' }));
   expect(repository.setQuestCompletion).toHaveBeenLastCalledWith(
     expect.objectContaining({ id: 'one' }),
@@ -186,7 +186,7 @@ test('completion coalesces taps, retries desired state, then supports saved undo
   );
   await act(() => listeners.completed({ tasks: [], hasMore: false }));
   await act(() => listeners.active({ tasks: [task], hasMore: false }));
-  jest.mocked(repository.setQuestCompletion).mockResolvedValueOnce(undefined);
+  jest.mocked(repository.setQuestCompletion).mockResolvedValueOnce(null);
   await fireEvent.press(screen.getByRole('checkbox', { name: 'Complete Read' }));
   expect(repository.setQuestCompletion).toHaveBeenLastCalledWith(
     expect.objectContaining({ id: 'one' }),
@@ -221,6 +221,7 @@ test('confirmed saved capture, edit, completion, undo and deletion restore after
         : task
     );
     publish();
+    return null;
   });
   jest.mocked(repository.deleteTask).mockImplementation(async (id) => {
     saved = saved.filter((task) => task.id !== id);
@@ -317,7 +318,7 @@ test('saved undo uses fresh active membership when the completed listener retain
   };
   await act(() => listeners.active({ tasks: [], hasMore: false }));
   await act(() => listeners.completed({ tasks: [task], hasMore: false }));
-  jest.mocked(repository.setQuestCompletion).mockResolvedValueOnce(undefined);
+  jest.mocked(repository.setQuestCompletion).mockResolvedValueOnce(null);
   await fireEvent.press(screen.getByRole('checkbox', { name: 'Undo completion of Read' }));
   expect(repository.setQuestCompletion).toHaveBeenLastCalledWith(
     expect.objectContaining({ id: 'one' }),
@@ -336,7 +337,7 @@ test('saved completion uses fresh completed membership when the active listener 
   const task = { id: 'one', title: 'Read', createdAt: new Timestamp(10, 0), completedAt: null };
   await act(() => listeners.completed({ tasks: [], hasMore: false }));
   await act(() => listeners.active({ tasks: [task], hasMore: false }));
-  jest.mocked(repository.setQuestCompletion).mockResolvedValueOnce(undefined);
+  jest.mocked(repository.setQuestCompletion).mockResolvedValueOnce(null);
   await fireEvent.press(screen.getByRole('checkbox', { name: 'Complete Read' }));
   expect(repository.setQuestCompletion).toHaveBeenLastCalledWith(
     expect.objectContaining({ id: 'one' }),

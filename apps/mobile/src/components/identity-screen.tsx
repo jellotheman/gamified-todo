@@ -299,6 +299,7 @@ function PrivateAccount({
   useEffect(() => {
     let active = true;
     let stop = () => {};
+    let currentRepository: ReturnType<typeof privateRepository> | null = null;
     const fail = () => {
       if (active) {
         setReady(false);
@@ -307,6 +308,7 @@ function PrivateAccount({
     };
     try {
       const repository = privateRepository(user.uid);
+      currentRepository = repository;
       void repository
         .ensureProfile()
         .then(() => {
@@ -326,6 +328,7 @@ function PrivateAccount({
     return () => {
       active = false;
       stop();
+      currentRepository?.dispose();
     };
   }, [user.uid, attempt]);
   return (
@@ -375,6 +378,7 @@ function PrivateAccount({
 
 export default function IdentityScreen() {
   const [user, setUser] = useState<Identity | null | undefined>(undefined);
+  const [sessionEpoch, setSessionEpoch] = useState(0);
   const [sessionError, setSessionError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [returnToAccount, setReturnToAccount] = useState(false);
@@ -395,6 +399,7 @@ export default function IdentityScreen() {
       (next) => {
         if (!active) return;
         generation.current++;
+        setSessionEpoch(generation.current);
         setUser(next);
         setReturnToAccount(false);
         setSessionError('');
@@ -468,7 +473,7 @@ export default function IdentityScreen() {
             </View>
           ) : user ? (
             <PrivateAccount
-              key={user.uid}
+              key={`${user.uid}-${sessionEpoch}`}
               user={user}
               initialAccountOpen={returnToAccount}
               onLeave={() => void leave()}

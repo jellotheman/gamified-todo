@@ -33,6 +33,7 @@ beforeEach(() => {
   });
   jest.mocked(repositoryFactory).mockImplementation((uid) => {
     const repository = {
+      dispose: jest.fn(),
       ensureProfile: jest.fn<Repository['ensureProfile']>().mockResolvedValue(undefined),
       subscribeProfile: jest.fn<Repository['subscribeProfile']>((next) => {
         next({ dailyGoal: 3 });
@@ -147,4 +148,18 @@ test('Account navigation preserves a draft and expanded windows while hiding ina
     expect.any(Function),
     expect.any(Function)
   );
+});
+
+test('a new auth event for the same UID replaces the private screen and disposes the old repository', async () => {
+  await render(<IdentityScreen />);
+  await act(() => observe({ uid: 'a', email: 'a@example.com' }));
+  const first = repositories.get('a')!;
+  await fireEvent.press(screen.getByRole('button', { name: 'Add quest' }));
+  await fireEvent.changeText(screen.getByLabelText('Quest title'), 'Previous session draft');
+  await fireEvent.press(screen.getByRole('button', { name: 'Close editor' }));
+  await act(() => observe({ uid: 'a', email: 'a@example.com' }));
+  expect(first.dispose).toHaveBeenCalled();
+  expect(repositories.get('a')).not.toBe(first);
+  await fireEvent.press(screen.getByRole('button', { name: 'Add quest' }));
+  expect(screen.getByLabelText('Quest title').props.value).toBe('');
 });

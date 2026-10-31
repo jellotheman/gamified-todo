@@ -1,6 +1,8 @@
 import { beforeEach, expect, jest, test } from '@jest/globals';
 import {
   doc,
+  getCountFromServer,
+  getDocFromServer,
   limit,
   onSnapshot,
   orderBy,
@@ -18,6 +20,7 @@ jest.mock('firebase/firestore', () => ({
   collection: jest.fn((_db, ...path: string[]) => path.join('/')),
   doc: jest.fn((_db, ...path: string[]) => ({ path: path.join('/'), id: 'generated-id' })),
   getCountFromServer: jest.fn(),
+  getDocFromServer: jest.fn(),
   runTransaction: jest.fn(),
   serverTimestamp: jest.fn(() => 'SERVER_TIME'),
   documentId: jest.fn(() => '__name__'),
@@ -379,4 +382,132 @@ test('routine identity creation aborts when the account changes during the ident
     repository.createQuest({ id: 'new', title: 'Walk', kind: 'daily', areaId: null })
   ).rejects.toThrow('session changed');
   expect(set).not.toHaveBeenCalled();
+});
+
+test('a denied stale completion retries only after confirmed contention changes the area day', async () => {
+  const repository = privateRepository('owner-a');
+  for (const count of [0, 1]) {
+    get.mockResolvedValueOnce({ exists: () => true, data: () => ({}) });
+    get.mockResolvedValueOnce({ exists: () => false, data: () => ({}) });
+    get.mockResolvedValueOnce({ exists: () => count > 0, data: () => ({ count }) });
+    if (count === 0) get.mockResolvedValueOnce({ exists: () => false, data: () => ({}) });
+  }
+  jest.mocked(runTransaction).mockImplementationOnce(async (_db, callback) => {
+    await callback({ get, set, update } as unknown as Parameters<typeof callback>[0]);
+    throw Object.assign(new Error('stale'), { code: 'permission-denied' });
+  });
+  jest.mocked(getDocFromServer).mockImplementation(async (reference) => {
+    const path = (reference as unknown as { path: string }).path;
+    return { exists: () => path.includes('areaDays'), data: () => ({ count: 1 }) } as never;
+  });
+  const submitted = repository.prepareCompletion('daily', 'r1', 'health', '2026-10-31');
+  await expect(repository.setQuestCompletion(submitted, true)).resolves.toBeNull();
+  expect(runTransaction).toHaveBeenCalledTimes(2);
+  expect(set).toHaveBeenLastCalledWith(
+    expect.objectContaining({ path: 'users/owner-a/areaDays/health_2026-10-31' }),
+    expect.objectContaining({ count: 2, completionId: 'daily_r1_2026-10-31' })
+  );
+});
+
+test('a permission denial with unchanged server documents is not retried', async () => {
+  const repository = privateRepository('owner-a');
+  get.mockResolvedValueOnce({ exists: () => true, data: () => ({}) });
+  get.mockResolvedValueOnce({ exists: () => false, data: () => ({}) });
+  jest.mocked(runTransaction).mockImplementationOnce(async (_db, callback) => {
+    await callback({ get, set, update } as unknown as Parameters<typeof callback>[0]);
+    throw Object.assign(new Error('denied'), { code: 'permission-denied' });
+  });
+  jest.mocked(getDocFromServer).mockResolvedValueOnce({ exists: () => false } as never);
+  await expect(
+    repository.setQuestCompletion(
+      repository.prepareCompletion('daily', 'r1', null, '2026-10-31'),
+      true
+    )
+  ).rejects.toThrow('denied');
+  expect(runTransaction).toHaveBeenCalledTimes(1);
+});
+
+test('same-account sign-in invalidates a pending conflict retry and detaches its subscriptions', async () => {
+  const repository = privateRepository('owner-a');
+  const sessionListener = jest.mocked(onAuthStateChanged).mock.calls[0][1];
+  if (typeof sessionListener !== 'function') throw new Error('Expected auth listener');
+  sessionListener(auth.currentUser);
+  const unsubscribe = jest.fn();
+  jest.mocked(onSnapshot).mockReturnValueOnce(unsubscribe);
+  const next = jest.fn();
+  repository.subscribeTaskWindow('active', 25, next, jest.fn(), jest.fn());
+  const receive = jest.mocked(onSnapshot).mock.calls[0][2] as (snapshot: unknown) => void;
+  get.mockResolvedValueOnce({ exists: () => true, data: () => ({}) });
+  get.mockResolvedValueOnce({ exists: () => false, data: () => ({}) });
+  get.mockResolvedValueOnce({ exists: () => false, data: () => ({}) });
+  get.mockResolvedValueOnce({ exists: () => false, data: () => ({}) });
+  jest.mocked(runTransaction).mockImplementationOnce(async (_db, callback) => {
+    await callback({ get, set, update } as unknown as Parameters<typeof callback>[0]);
+    throw Object.assign(new Error('stale'), { code: 'permission-denied' });
+  });
+  let release!: () => void;
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  jest.mocked(getDocFromServer).mockImplementation(async (reference) => {
+    entered();
+    await waiting;
+    const path = (reference as unknown as { path: string }).path;
+    return { exists: () => path.includes('areaDays'), data: () => ({ count: 1 }) } as never;
+  });
+  const result = repository.setQuestCompletion(
+    repository.prepareCompletion('daily', 'r1', 'health', '2026-10-31'),
+    true
+  );
+  await started;
+  Object.assign(auth, { currentUser: null });
+  sessionListener(null);
+  Object.assign(auth, { currentUser: { uid: 'owner-a' } });
+  sessionListener(auth.currentUser);
+  release();
+  await expect(result).rejects.toThrow('session changed');
+  expect(runTransaction).toHaveBeenCalledTimes(1);
+  expect(unsubscribe).toHaveBeenCalled();
+  receive({ docs: [], metadata: { fromCache: false, hasPendingWrites: false } });
+  expect(next).not.toHaveBeenCalled();
+  expect(() => repository.prepareQuest('Old session', 'daily', null)).toThrow('session changed');
+});
+
+test('a same-UID replacement without a delivered callback cannot resolve an old progress read', async () => {
+  const repository = privateRepository('owner-a');
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  jest.mocked(getCountFromServer).mockImplementation(async () => {
+    await waiting;
+    return { data: () => ({ count: 1 }) } as never;
+  });
+  const result = repository.readProgress();
+  Object.assign(auth, { currentUser: { uid: 'owner-a' } });
+  release();
+  await expect(result).rejects.toThrow('session changed');
+});
+
+test('the initial auth observation preserves the repository; a later same-user event invalidates it', () => {
+  const repository = privateRepository('owner-a');
+  const sessionListener = jest.mocked(onAuthStateChanged).mock.calls[0][1];
+  if (typeof sessionListener !== 'function') throw new Error('Expected auth listener');
+  sessionListener(auth.currentUser);
+  expect(repository.prepareQuest('Valid', 'daily', null).title).toBe('Valid');
+  sessionListener(auth.currentUser);
+  expect(() => repository.prepareQuest('Old session', 'daily', null)).toThrow('session changed');
+});
+
+test('observing a session mismatch permanently invalidates the repository even if the old user object returns', () => {
+  const repository = privateRepository('owner-a');
+  const original = auth.currentUser;
+  Object.assign(auth, { currentUser: null });
+  expect(() => repository.prepareQuest('Old session', 'daily', null)).toThrow('session changed');
+  Object.assign(auth, { currentUser: original });
+  expect(() => repository.prepareQuest('Old session', 'daily', null)).toThrow('session changed');
 });

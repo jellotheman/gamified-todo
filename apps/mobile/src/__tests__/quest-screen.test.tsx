@@ -1,5 +1,6 @@
 import { beforeEach, expect, jest, test } from '@jest/globals';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import * as Native from 'react-native';
 import QuestScreen from '../components/quest-screen';
 import type {
   privateRepository,
@@ -59,7 +60,7 @@ beforeEach(() => {
     prepareCompletion: jest.fn<Repository['prepareCompletion']>((kind, id, areaId, day) =>
       Object.freeze({ kind, id, areaId, date: day! })
     ),
-    setQuestCompletion: jest.fn<Repository['setQuestCompletion']>().mockResolvedValue(undefined),
+    setQuestCompletion: jest.fn<Repository['setQuestCompletion']>().mockResolvedValue(null),
     editQuest: jest.fn<Repository['editQuest']>().mockResolvedValue(undefined),
     deleteQuest: jest.fn<Repository['deleteQuest']>().mockResolvedValue(undefined),
   } as unknown as Repository;
@@ -379,4 +380,36 @@ test('the editor wraps long titles and submits the full validated value', async 
   expect(repository.createQuest).toHaveBeenCalledWith(
     expect.objectContaining({ title: title.trim() })
   );
+});
+
+test('web action modal focus does not call the unsupported native node lookup', async () => {
+  await render(<QuestScreen repository={repository} visible />);
+  await act(() =>
+    publishActive({
+      tasks: [
+        {
+          id: 't1',
+          title: 'Read',
+          areaId: null,
+          completedAt: null,
+          createdAt: {} as TaskWindow['tasks'][number]['createdAt'],
+        },
+      ],
+      hasMore: false,
+    })
+  );
+  await fireEvent.press(screen.getByRole('button', { name: 'Quest actions for Read' }));
+  const originalPlatform = Native.Platform.OS;
+  Object.defineProperty(Native.Platform, 'OS', { value: 'web', configurable: true });
+  const lookup = jest.spyOn(Native, 'findNodeHandle').mockImplementation(() => {
+    throw new Error('unsupported on web');
+  });
+  try {
+    await fireEvent(screen.getByTestId('quest-dialog'), 'show');
+    expect(lookup).not.toHaveBeenCalled();
+    expect(screen.getByText('Quest actions')).toBeTruthy();
+  } finally {
+    lookup.mockRestore();
+    Object.defineProperty(Native.Platform, 'OS', { value: originalPlatform, configurable: true });
+  }
 });
